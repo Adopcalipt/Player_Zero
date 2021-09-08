@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Drawing;
@@ -15,10 +15,9 @@ namespace OnlinePlayerz
     public class Main : Script
     {
         private ScriptSettings GetKeys;
-
+        
         bool bTrainM = true;//set the test then set to false
         bool bLoadUp = true;
-        bool bNoSpawnKills = false;
         bool bPlayerList = false;
         bool bHeistPop = true;
         bool bSpaceWeaps = false;
@@ -41,12 +40,14 @@ namespace OnlinePlayerz
         int iMaxSession = 475000;
         int iAggression = 5;
         int iGetlayList = 19;
-        int iClearPlayList = 23;
+        int iClearPlayList = 131;
 
-        int PlayerGroups = Game.Player.Character.RelationshipGroup;
-        int AttackingNPCs = World.AddRelationshipGroup("AttackNPCs");
-        int FollowingNPCs = World.AddRelationshipGroup("FollowerNPCs");
-        int WarringNPCs = World.AddRelationshipGroup("WarNPCs");
+        int iPlayerGroups = Game.Player.Character.RelationshipGroup;
+        int iAttackingNPCs = World.AddRelationshipGroup("AttackNPCs");
+        int iFollowingNPCs = World.AddRelationshipGroup("FollowerNPCs");
+        int iWarringNPCs = World.AddRelationshipGroup("WarNPCs");
+
+        Vector3 LetsGoHere = Vector3.Zero;
 
         BackUpBrain BlowenMyBrains = new BackUpBrain();
 
@@ -62,6 +63,8 @@ namespace OnlinePlayerz
 
         List<ClothBank> MaleCloth = new List<ClothBank>();
         List<ClothBank> FemaleCloth = new List<ClothBank>();
+
+        List<int> iVehHandles = new List<int>();
 
         public Main()
         {
@@ -85,7 +88,7 @@ namespace OnlinePlayerz
                 iMaxSession = GetKeys.GetValue<int>("Settings", "iMaxSession", 475000);
                 bSpaceWeaps = GetKeys.GetValue<bool>("Settings", "SpaceWeaps", false);
                 iGetlayList = GetKeys.GetValue<int>("Settings", "iGetlayList", 19);
-                iClearPlayList = GetKeys.GetValue<int>("Settings", "iClearPlayList", 23);
+                iClearPlayList = GetKeys.GetValue<int>("Settings", "iClearPlayList", 131);
             }
 
             if (iAggression > 10)
@@ -103,11 +106,6 @@ namespace OnlinePlayerz
 
             if (iMinSession > iMaxSession)
                 iMaxSession = iMinSession + 1;
-
-            if (iAggression < 6)
-                bNoSpawnKills = true;
-            else
-                bNoSpawnKills = false;
         }
         private void BeeLog(string sLogs, TextWriter tEx)
         {
@@ -137,18 +135,20 @@ namespace OnlinePlayerz
             using (StreamWriter tEx = File.AppendText(sBeeLogs))
                 BeeLog("LoadUp", tEx);
 
-            World.SetRelationshipBetweenGroups(Relationship.Hate, PlayerGroups, AttackingNPCs);
-            World.SetRelationshipBetweenGroups(Relationship.Hate, AttackingNPCs, PlayerGroups);
-            World.SetRelationshipBetweenGroups(Relationship.Companion, PlayerGroups, FollowingNPCs);
-            World.SetRelationshipBetweenGroups(Relationship.Companion, FollowingNPCs, PlayerGroups);
-            World.SetRelationshipBetweenGroups(Relationship.Hate, WarringNPCs, FollowingNPCs);
-            World.SetRelationshipBetweenGroups(Relationship.Hate, FollowingNPCs, WarringNPCs);
-            World.SetRelationshipBetweenGroups(Relationship.Hate, WarringNPCs, AttackingNPCs);
-            World.SetRelationshipBetweenGroups(Relationship.Hate, AttackingNPCs, WarringNPCs);
+            World.SetRelationshipBetweenGroups(Relationship.Hate, iPlayerGroups, iAttackingNPCs);
+            World.SetRelationshipBetweenGroups(Relationship.Hate, iAttackingNPCs, iPlayerGroups);
+            World.SetRelationshipBetweenGroups(Relationship.Companion, iPlayerGroups, iFollowingNPCs);
+            World.SetRelationshipBetweenGroups(Relationship.Companion, iFollowingNPCs, iPlayerGroups);
+            World.SetRelationshipBetweenGroups(Relationship.Hate, iWarringNPCs, iPlayerGroups);
+            World.SetRelationshipBetweenGroups(Relationship.Hate, iPlayerGroups, iWarringNPCs);
+            World.SetRelationshipBetweenGroups(Relationship.Hate, iWarringNPCs, iFollowingNPCs);
+            World.SetRelationshipBetweenGroups(Relationship.Hate, iFollowingNPCs, iWarringNPCs);
+            World.SetRelationshipBetweenGroups(Relationship.Hate, iWarringNPCs, iAttackingNPCs);
+            World.SetRelationshipBetweenGroups(Relationship.Hate, iAttackingNPCs, iWarringNPCs);
 
 
-            Function.Call(Hash.SET_PED_AS_GROUP_LEADER, Game.Player.Character.Handle, FollowingNPCs);
-            Function.Call(Hash.SET_GROUP_FORMATION, FollowingNPCs, 3);
+            Function.Call(Hash.SET_PED_AS_GROUP_LEADER, Game.Player.Character.Handle, iFollowingNPCs);
+            Function.Call(Hash.SET_GROUP_FORMATION, iFollowingNPCs, 3);
             iTimers.Clear();
             SetBTimer(30000, -1);
             SetBTimer(RandInt(iMinWait, iMaxWait), -1);
@@ -185,6 +185,9 @@ namespace OnlinePlayerz
         }
         public bool BOnBOff(int iBee)
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("BOnBOff, iBee == " + iBee, tEx);
+
             if (BeOnOff.Count == 0)
             {
                 for (int i = 0; i < 25; i++)
@@ -418,6 +421,10 @@ namespace OnlinePlayerz
         }
         private void FindMisfits()
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("FindMisfits", tEx);
+
+
             if (Directory.Exists("" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/"))
             {
                 if (File.Exists(sOutfitts))
@@ -479,7 +486,9 @@ namespace OnlinePlayerz
 
             if (bPed)
             {
-                PedList[iPos].ThisBlip.Remove();
+                if (PedList[iPos].ThisBlip != null)
+                    PedList[iPos].ThisBlip.Remove();
+
                 if (PedList[iPos].DirBlip != null)
                     PedList[iPos].DirBlip.Remove();
 
@@ -490,6 +499,7 @@ namespace OnlinePlayerz
                     PedList[iPos].ThisPed.Delete();
                 else
                     PedList[iPos].ThisPed.MarkAsNoLongerNeeded();
+
                 PedList.RemoveAt(iPos);
             }
             else
@@ -554,60 +564,25 @@ namespace OnlinePlayerz
             {
                 if (BOnBOff(0))
                 {
-                    if (iAggression < 3)
-                    {
-                        int iPedMode = LessRandomz(1, 7, 0);
-
-                        if (iPedMode == 3 || iPedMode == 6)
-                            iPedMode = 4;
-
-                        if (iPedMode < 5)
-                            FindAPed(Game.Player.Character.Position, 95.00f, iPedMode, true, true);
-                        else
-                        {
-                            int iTypeO = LessRandomz(1, 9, 12);
-                            FindNearestVeh(Game.Player.Character.Position, RandVeh(iTypeO), 95.00f, iPedMode, true, iTypeO);
-                        }
-                    }
-                    else if (iAggression < 6)
-                    {
-                        int iPedMode = LessRandomz(1, 7, 0);
-                        if (iPedMode < 5)
-                            FindAPed(Game.Player.Character.Position, 95.00f, iPedMode, true, true);
-                        else
-                        {
-                            int iTypeO = 1;
-                            if (iPedMode == 6)
-                                iTypeO = LessRandomz(1, 9, 12);
-                            else
-                                iTypeO = LessRandomz(10, 11, 13);
-                            FindNearestVeh(Game.Player.Character.Position, RandVeh(iTypeO), 95.00f, iPedMode, true, iTypeO);
-                        }
-                    }
+                    if (BOnBOff(3))
+                        FindAPed(Game.Player.Character.Position, 95.00f, true, -1);
                     else
                     {
-                        int iPedMode = LessRandomz(1, 7, 0);
+                        int iTypeO = LessRandomz(1, 9, 12);
+                        FindNearestVeh(Game.Player.Character.Position, RandVeh(iTypeO), true);
+                    }
 
-                        if (iPedMode == 4 || iPedMode == 2)
-                            iPedMode = 6;
-
-                        if (iPedMode < 5)
-                            FindAPed(Game.Player.Character.Position, 95.00f, iPedMode, true, true);
+                    if (iCurrentPlayerz + 5 < iMaxPlayers)
+                    {
+                        if (bHeistPop)
+                            NearHiest(true);
                         else
-                        {
-                            int iTypeO = LessRandomz(10, 11, 13);
-                            FindNearestVeh(Game.Player.Character.Position, RandVeh(iTypeO), 95.00f, iPedMode, true, iTypeO);
-                        }
+                            CeoBikersGreaf();
                     }
                 }
                 else
                     InABuilding();
-
-                if (bHeistPop)
-                {
-                    if (iCurrentPlayerz + 3 < iMaxPlayers)
-                        NearHiest(true);
-                }
+        
             }
         }
         public int RandInt(int iMin, int iMax)
@@ -648,22 +623,22 @@ namespace OnlinePlayerz
             public Vector3 Pos { get; set; }
             public float Dir { get; set; }
         }
-        public Vehicle LookNear(Vector3 Vec3, string sModel, float fRadi, int iBrain, bool bBlip)
+        public Vehicle LookNear(Vector3 Vec3)
         {
             using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("LookNear, sModel == " + sModel + ", fRadi" + fRadi + ", iBrain == " + iBrain + ", bBlip == " + bBlip, tEx);
+                BeeLog("LookNear", tEx);
 
             Vehicle Vickary = null;
 
             if (World.GetNextPositionOnStreet(Game.Player.Character.Position).DistanceTo(Game.Player.Character.Position) < 95.00f)
             {
-                Vehicle[] CarSpot = World.GetNearbyVehicles(Vec3, fRadi);
+                Vehicle[] CarSpot = World.GetNearbyVehicles(Vec3, 200.00f);
                 for (int i = 0; i < CarSpot.Count(); i++)
                 {
                     if (VehExists(CarSpot, i) && Vickary == null)
                     {
                         Vehicle Veh = CarSpot[i];
-                        if (Veh.IsPersistent == false && Veh.Position.DistanceTo(Game.Player.Character.Position) > 10.00f && Veh.ClassType != VehicleClass.Boats && Veh.ClassType != VehicleClass.Cycles && Veh.ClassType != VehicleClass.Helicopters && Veh.ClassType != VehicleClass.Planes && Veh.ClassType != VehicleClass.Trains && Veh != Game.Player.Character.CurrentVehicle && !Veh.IsOnScreen)
+                        if (!Veh.IsPersistent && Veh.Position.DistanceTo(Game.Player.Character.Position) > 15.00f && Veh.ClassType != VehicleClass.Boats && Veh.ClassType != VehicleClass.Cycles && Veh.ClassType != VehicleClass.Helicopters && Veh.ClassType != VehicleClass.Planes && Veh.ClassType != VehicleClass.Trains && !Veh.IsOnScreen)
                         {
                             if (!Veh.IsSeatFree(VehicleSeat.Driver) || Veh.EngineRunning)
                                 Vickary = Veh;
@@ -674,28 +649,31 @@ namespace OnlinePlayerz
             }
             return Vickary;
         }
-        private void FindNearestVeh(Vector3 Vec3, string sModel, float fRadi, int iBrain, bool bBlip, int iType)
+        public Vehicle FindNearestVeh(Vector3 Vec3, string sModel, bool bAddPlayer)
         {
             using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("FindNearestVeh, sModel == " + sModel + ", fRadi" + fRadi + ", iBrain == " + iBrain + ", bBlip == " + bBlip, tEx);
+                BeeLog("FindNearestVeh, sModel == " + sModel, tEx);
 
-            Vehicle VickPos = LookNear(Vec3, sModel, fRadi, iBrain, bBlip);
+            Vehicle VickPos = LookNear(Vec3);
 
             while (VickPos == null)
             {
                 PlayerZerosAI(false);
 
-                Script.Wait(1000);
-                VickPos = LookNear(Game.Player.Character.Position, sModel, 150.00f, iBrain, bBlip);
+                Script.Wait(100);
+                VickPos = LookNear(Game.Player.Character.Position);
             }
             Vector3 PedPos = VickPos.Position;
             float PedRot = VickPos.Heading;
             VickPos.Delete();
 
-            VehicleSpawn(sModel, PedPos, PedRot, bBlip, iBrain, iType);
+            return VehicleSpawn(sModel, PedPos, PedRot, bAddPlayer, true);
         }
         public bool VehExists(Vehicle[] Vehlist, int iPos)
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("VehExists, iPos == " + iPos, tEx);
+
             bool bExist = false;
 
             if (iPos < Vehlist.Count())
@@ -710,6 +688,9 @@ namespace OnlinePlayerz
         }
         public bool IsItARealVehicle(string sVehName)
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("IsItARealVehicle, sVehName == " + sVehName, tEx);
+
             bool bIsReal = false;
 
             int iVehHash = Function.Call<int>(Hash.GET_HASH_KEY, sVehName);
@@ -1030,6 +1011,7 @@ namespace OnlinePlayerz
                     sVehicles.Add("VAGRANT"); //
                     sVehicles.Add("ZHABA"); //
                     sVehicles.Add("WINKY"); //><!-- Vapid Winky -->	
+                    sVehicles.Add("SQUADDIE"); 
                 }
             }       //Offroad
             else if (iVechList == 9)
@@ -1157,12 +1139,28 @@ namespace OnlinePlayerz
                 sVehicles.Add("PYRO"); //
                 sVehicles.Add("ROGUE"); //
                 sVehicles.Add("MOLOTOK"); //<!-- V-65 Molotok -->
+                sVehicles.Add("volatol"); //
+                sVehicles.Add("bombushka");
+                sVehicles.Add("seabreeze");
+                sVehicles.Add("nokota");
+                sVehicles.Add("mogul");
+                sVehicles.Add("microlight");
+                sVehicles.Add("howard");
+                sVehicles.Add("tula");
+                sVehicles.Add("alphaz1");
             }       //Attack Planes
             else if (iVechList == 13)
             {
                 sVehicles.Add("BUZZARD"); //<!-- Buzzard Attack Chopper -->
                 sVehicles.Add("HUNTER"); //<!-- FH-1 Hunter -->
                 sVehicles.Add("SAVAGE"); //
+                if (bTrainM)
+                {
+                    sVehicles.Add("seasparrow2"); //
+                    sVehicles.Add("seasparrow");
+                    sVehicles.Add("akula");
+                    sVehicles.Add("havok");
+                }
             }       //Attack Helicopters
             else
             {
@@ -1174,15 +1172,15 @@ namespace OnlinePlayerz
 
             return sVehicles[RandInt(0, sVehicles.Count - 1)];
         }
-        public Vehicle VehicleSpawn(string sVehModel, Vector3 VecLocal, float VecHead, bool bBlip, int iBrain,int iVehType)
+        public Vehicle VehicleSpawn(string sVehModel, Vector3 VecLocal, float VecHead, bool bAddPlayer, bool bRandomFeat)
         {
             using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("VehicleSpawn, sVehModel == " + sVehModel + ", bBlip == " + bBlip + ", iBrain == " + iBrain, tEx);
+                BeeLog("VehicleSpawn, sVehModel == " + sVehModel + ", bAddPlayer == " + bAddPlayer, tEx);
 
             Vehicle BuildVehicle = null;
 
-            if (sVehModel == "" || !IsItARealVehicle(sVehModel))
-                sVehModel = RandVeh(iVehType);
+            if (!IsItARealVehicle(sVehModel))
+                sVehModel = "MAMBA";
 
             int iVehHash = Function.Call<int>(Hash.GET_HASH_KEY, sVehModel);
 
@@ -1196,8 +1194,16 @@ namespace OnlinePlayerz
 
                 BuildVehicle.IsPersistent = true;
 
-                if (iBrain > 0)
-                    GenPlayerPed(BuildVehicle.Position, BuildVehicle.Heading, iBrain, BuildVehicle, -1);
+                if (bAddPlayer)
+                {
+                    GenPlayerPed(BuildVehicle.Position, BuildVehicle.Heading, BuildVehicle, -1, -1);
+                    
+                    if (iCurrentPlayerz + 7 < iMaxPlayers && RandInt(0, 20) < 5)
+                    {
+                        for (int i = 0; i < BuildVehicle.PassengerSeats - 1; i++)
+                            GenPlayerPed(BuildVehicle.Position, BuildVehicle.Heading, BuildVehicle, i, -1);
+                    }
+                }
 
                 Function.Call(Hash.SET_MODEL_AS_NO_LONGER_NEEDED, iVehHash);
             }
@@ -1206,32 +1212,31 @@ namespace OnlinePlayerz
 
             return BuildVehicle;
         }
-        public Vector3 FindAPed(Vector3 vZone, float fRadius, int iBrain, bool bBlip, bool bReplace)
+        public Vector3 FindAPed(Vector3 vZone, float fRadius, bool bReplace, int iReload)
         {
             using (StreamWriter tEx = File.AppendText(sBeeLogs))
                 BeeLog("FindAPed", tEx);
 
-            Ped VPedPos = DoStopTillDrop(vZone, fRadius, iBrain, bBlip, bReplace);
+            Ped VPedPos = DoStopTillDrop(vZone, fRadius);
 
             while (VPedPos == null)
             {
                 PlayerZerosAI(false);
-
-                Script.Wait(1000);
-                VPedPos = DoStopTillDrop(Game.Player.Character.Position, 150.00f, iBrain, bBlip, bReplace);
+                Script.Wait(100);
+                VPedPos = DoStopTillDrop(Game.Player.Character.Position, 150.00f);
             }
             Vector3 PedPos = VPedPos.Position;
             float PedRot = VPedPos.Heading;
             VPedPos.Delete();
             if (bReplace)
-                GenPlayerPed(PedPos, PedRot, iBrain, null, 0);
+                GenPlayerPed(PedPos, PedRot, null, 0, iReload);
 
             return PedPos;
         }
-        public Ped DoStopTillDrop(Vector3 vZone, float fRadius, int iBrain, bool bBlip, bool bReplace)
+        public Ped DoStopTillDrop(Vector3 vZone, float fRadius)
         {
             using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("DoStopTillDrop, iBrain == " + iBrain, tEx);
+                BeeLog("DoStopTillDrop", tEx);
 
             Ped RandPed = null;
             Ped[] MadPeds = World.GetNearbyPeds(vZone, fRadius);
@@ -1251,6 +1256,9 @@ namespace OnlinePlayerz
         }
         public bool PedExists(Ped[] Peddylist, int iPos)
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("PedExists, iPos == " + iPos, tEx);
+
             bool bExist = false;
 
             if (iPos < Peddylist.Count())
@@ -1264,17 +1272,24 @@ namespace OnlinePlayerz
 
             return bExist;
         }
-        public Ped GenPlayerPed(Vector3 vLocal, float fAce, int iBrain, Vehicle vMyCar, int iSeat)
+        public Ped GenPlayerPed(Vector3 vLocal, float fAce, Vehicle vMyCar, int iSeat, int iReload)
         {
             using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("GenPlayerPed, iBrain == " + iBrain, tEx);
+                BeeLog("GenPlayerPed, iSeat == " + iSeat + ", iReload == " + iReload, tEx);
 
             Ped MyPed = null;
-
             bool bMale = false;
             string sPeddy = "mp_f_freemode_01";
 
-            if (BOnBOff(1))
+            if (iReload == -1)
+            {
+                if (BOnBOff(1))
+                {
+                    bMale = true;
+                    sPeddy = "mp_m_freemode_01";
+                }
+            }
+            else if (PedList[iReload].PFMySetting.PFMale)
             {
                 bMale = true;
                 sPeddy = "mp_m_freemode_01";
@@ -1296,14 +1311,15 @@ namespace OnlinePlayerz
                     MyPed.MaxHealth = RandInt(200, 400);
                     MyPed.Health = MyPed.MaxHealth;
 
-                    if (vMyCar != null)
-                        WarptoAnyVeh(vMyCar, MyPed, iSeat);
+                    if (iReload == -1)
+                    {
+                        PedFixtures MyFixtures = new PedFixtures();
+                        MyFixtures.PFMale = bMale;
 
-                    GunningIt(MyPed);
-
-                    NpcBrains(MyPed, iBrain);
-                    OnlineFaceTypes(MyPed, bMale);
-                    OnlineWardrobe(MyPed, bMale);
+                        OnlineFaceTypes(MyPed, bMale, vMyCar, iSeat, MyFixtures, iReload);
+                    }
+                    else
+                        OnlineFaceTypes(MyPed, bMale, vMyCar, iSeat, null, iReload);
                 }
                 else
                     MyPed = null;
@@ -1318,13 +1334,9 @@ namespace OnlinePlayerz
             using (StreamWriter tEx = File.AppendText(sBeeLogs))
                 BeeLog("WarptoAnyVeh, iSeat == " + iSeat, tEx);
 
-            while (!Peddy.IsInVehicle(Vhic))
-            {
-                Function.Call(Hash.SET_PED_INTO_VEHICLE, Peddy, Vhic, iSeat);
-                Script.Wait(100);
-            }
+            Function.Call(Hash.SET_PED_INTO_VEHICLE, Peddy, Vhic, iSeat);
         }
-        private void EnterAnyVeh(Vehicle Vhic, Ped Peddy, float Run)
+        private void EnterAnyVeh(Vehicle Vhic, Ped Peddy, float Run, int iBPed)
         {
             using (StreamWriter tEx = File.AppendText(sBeeLogs))
                 BeeLog("EnterAnyVeh, Run == " + Run, tEx);
@@ -1342,37 +1354,104 @@ namespace OnlinePlayerz
                 }
                 if (bFound)
                 {
-                    Function.Call(Hash.TASK_ENTER_VEHICLE, Peddy, Vhic, -1, iSeats, Run, 1, 0);
-                    Peddy.BlockPermanentEvents = true;
-                    Peddy.AlwaysKeepTask = true;
+                    if (Peddy.Position.DistanceTo(Vhic.Position) < 65.00f)
+                    {
+                        while (!Peddy.IsInVehicle(Vhic) && !Peddy.IsDead && !Peddy.IsFalling)
+                        {
+                            PlayerZerosAI(false);
+
+                            if (!Function.Call<bool>(Hash.IS_PED_GETTING_INTO_A_VEHICLE, Peddy))
+                                Function.Call(Hash.TASK_ENTER_VEHICLE, Peddy, Vhic, -1, iSeats, Run, 1, 0);
+                            else if (Peddy.Position.DistanceTo(Vhic.Position) > 65.00f)
+                                WarptoAnyVeh(Vhic, Peddy, iSeats);
+                            Script.Wait(100);
+                        }
+                    }
+                    else
+                        WarptoAnyVeh(Vhic, Peddy, iSeats);
+                    //Peddy.BlockPermanentEvents = true;
+                    //Peddy.AlwaysKeepTask = true;
+                }
+                else
+                {
+                    if (iBPed != -1)
+                    {
+                        if (PedList[iBPed].ThisVeh != null)
+                            PedList[iBPed].ThisVeh.MarkAsNoLongerNeeded();
+
+                        PedList[iBPed].ThisVeh = FindNearestVeh(Game.Player.Character.Position, RandVeh(RandInt(1, 9)), false);
+                        while (!Peddy.IsInVehicle() && !Peddy.IsDead && !Peddy.IsFalling)
+                        {
+                            PlayerZerosAI(false);
+
+                            if (!Function.Call<bool>(Hash.IS_PED_GETTING_INTO_A_VEHICLE, Peddy))
+                                Function.Call(Hash.TASK_ENTER_VEHICLE, Peddy, PedList[iBPed].ThisVeh, -1, -1, Run, 1, 0);
+                            else if (Peddy.Position.DistanceTo(Vhic.Position) > 65.00f)
+                                WarptoAnyVeh(Vhic, Peddy, iSeats);
+                            Script.Wait(100);
+                        }
+                        PedList[iBPed].bDriver = true;
+                    }
                 }
             }
         }
-        private void GetOutVehicle(Ped Peddy)
+        private void GetOutVehicle(Ped Peddy, int iPed)
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("GetOutVehicle", tEx);
+
             if (Peddy.IsInVehicle())
             {
                 Vehicle PedVeh = Peddy.CurrentVehicle;
                 Function.Call(Hash.TASK_LEAVE_VEHICLE, Peddy, PedVeh, 4160);
             }
+            ClearPedBlips(iPed);
+            PedList[iPed].DirBlip = DirectionalBlimp(PedList[iPed].ThisPed);
+            PedList[iPed].ThisBlip = PedBlimp(PedList[iPed].ThisPed, 1, PedList[iPed].sMyName, PedList[iPed].bFriendly);
+        }
+        private void EmptyVeh(Vehicle Vhic)
+        {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("EmptyVeh", tEx);
+
+            if (Vhic.Exists())
+            {
+                int iSeats = 0;
+                while (iSeats < Function.Call<int>(Hash.GET_VEHICLE_MAX_NUMBER_OF_PASSENGERS, Vhic.Handle))
+                {
+                    if (!Function.Call<bool>(Hash.IS_VEHICLE_SEAT_FREE, Vhic.Handle, iSeats))
+                        Function.Call(Hash.TASK_LEAVE_VEHICLE, Function.Call<Ped>(Hash.GET_PED_IN_VEHICLE_SEAT, Vhic.Handle, iSeats).Handle, Vhic.Handle, 4160);
+                    iSeats += 1;
+                }
+            }
         }
         private void FolllowTheLeader(Ped Peddy)
         {
-            Function.Call(Hash.SET_PED_AS_GROUP_MEMBER, Peddy.Handle, FollowingNPCs);
-            Function.Call(Hash.SET_PED_PATH_CAN_USE_CLIMBOVERS, Peddy.Handle, true);
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("FolllowTheLeader", tEx);
+
+            Peddy.RelationshipGroup = Game.Player.Character.RelationshipGroup;
+            Function.Call(Hash.SET_PED_AS_GROUP_MEMBER, Peddy.Handle, iPlayerGroups);
             Function.Call(Hash.TASK_FOLLOW_TO_OFFSET_OF_ENTITY, Peddy.Handle, Game.Player.Character.Handle, 0.0f, 3.0f, 0.0f, 1.0f, -1, 0.5f, true);
-            Function.Call(Hash.SET_PED_CAN_TELEPORT_TO_GROUP_LEADER, Peddy.Handle, FollowingNPCs, true);
+            Function.Call(Hash.SET_PED_CAN_TELEPORT_TO_GROUP_LEADER, Peddy.Handle, iFollowingNPCs, true);
             Function.Call(Hash.SET_PED_FLEE_ATTRIBUTES, Peddy.Handle, 0, true);
-            Peddy.BlockPermanentEvents = true;
+            Peddy.BlockPermanentEvents = false;
+            Peddy.AlwaysKeepTask = true;
             Peddy.CanBeTargetted = true;
         }
         private void ExMember(Ped Peddy)
         {
-            if (Function.Call<bool>(Hash.IS_PED_GROUP_MEMBER, Peddy.Handle, FollowingNPCs))
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("ExMember", tEx);
+
+            if (Function.Call<bool>(Hash.IS_PED_GROUP_MEMBER, Peddy.Handle, iPlayerGroups))
                 Function.Call(Hash.REMOVE_PED_FROM_GROUP, Peddy.Handle);
         }
         private void DriveBye(Ped Peddy)
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("DriveBye", tEx);
+
             if (Peddy.IsInVehicle())
             {
                 if (Peddy.SeatIndex == VehicleSeat.Driver)
@@ -1391,18 +1470,26 @@ namespace OnlinePlayerz
         }
         private void DriveAround(Ped Peddy)
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("DriveAround", tEx);
+
             if (Peddy.IsInVehicle())
             {
                 if (Peddy.SeatIndex == VehicleSeat.Driver)
                 {
-                    Peddy.Task.CruiseWithVehicle(Peddy.CurrentVehicle, 85.00f, 0);
+                    float fAggi = iAggression / 100;
+                    Peddy.Task.CruiseWithVehicle(Peddy.CurrentVehicle, 85.00f, 2883621);
                     Function.Call(Hash.SET_DRIVER_ABILITY, Peddy.Handle, 1.00f);
+                    Function.Call(Hash.SET_DRIVER_AGGRESSIVENESS, Peddy.Handle, fAggi);
                     Function.Call(Hash.SET_PED_STEERS_AROUND_VEHICLES, Peddy.Handle, true);
                 }
             }
         }
         private void DriveTooo(Ped Peddy, bool bRunOver)
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("DriveTooo, bRunOver == "+ bRunOver, tEx);
+
             if (Peddy.IsInVehicle())
             {
                 if (Peddy.SeatIndex == VehicleSeat.Driver)
@@ -1417,7 +1504,22 @@ namespace OnlinePlayerz
                     Function.Call(Hash.SET_PED_STEERS_AROUND_VEHICLES, Peddy.Handle, true);
                 }
             }
-        }      
+        }
+        private void DriveToooDest(Ped Peddy, Vector3 Vme)
+        {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("DriveToooDest, Vme == " + Vme, tEx);
+
+            if (Peddy.IsInVehicle())
+            {
+                if (Peddy.SeatIndex == VehicleSeat.Driver)
+                {
+                    Peddy.Task.DriveTo(Peddy.CurrentVehicle, Vme, 1.00f, 45.00f, 2883621);
+                    Function.Call(Hash.SET_DRIVER_ABILITY, Peddy.Handle, 1.00f);
+                    Function.Call(Hash.SET_PED_STEERS_AROUND_VEHICLES, Peddy.Handle, true);
+                }
+            }
+        }
         private void FightPlayer(Ped Peddy, bool bInVeh)
         {
             using (StreamWriter tEx = File.AppendText(sBeeLogs))
@@ -1426,8 +1528,9 @@ namespace OnlinePlayerz
             Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, Peddy.Handle);
             Peddy.IsEnemy = true;
             Peddy.CanBeTargette﻿d﻿ = true;
-            Peddy.RelationshipGroup = AttackingNPCs;
+            Peddy.RelationshipGroup = iAttackingNPCs;
             Function.Call(Hash.SET_PED_FLEE_ATTRIBUTES, Peddy.Handle, 0, true);
+            Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 46, true);
             if (!bInVeh)
                 Peddy.Task.FightAgainst(Game.Player.Character);
             else
@@ -1435,26 +1538,42 @@ namespace OnlinePlayerz
         }
         private void AirAttack(int iPed)
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("AirAttack, iPed == " + iPed, tEx);
+
             Ped Peddy = PedList[iPed].ThisPed;
             if (RandInt(0, 50) < 25)
                 HeliFighter(Peddy, iPed);
             else
                 LaserFighter(Peddy, iPed);
-
         }
         private void HeliFighter(Ped Peddy,int iPed)
         {
-            Vehicle vHeli = VehicleSpawn(RandVeh(13), new Vector3(Peddy.Position.X, Peddy.Position.Y, Peddy.Position.Z + 250.00f), 0.00f, false, 0, 13);
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("HeliFighter, iPed == " + iPed, tEx);
+
+            ClearPedBlips(iPed);
+            string sVeh = RandVeh(13);
+            Vehicle vHeli = VehicleSpawn(sVeh, new Vector3(Peddy.Position.X, Peddy.Position.Y, Peddy.Position.Z + 250.00f), 0.00f, false, false);
             WarptoAnyVeh(vHeli, Peddy, -1);
             PedList[iPed].ThisVeh = vHeli;
+            PedList[iPed].ThisBlip = PedBlimp(Peddy, 422, PedList[iPed].sMyName, false);
             FlyAway(Peddy, Game.Player.Character.Position, 250.00f, 0.00f);
             Function.Call(Hash.SET_PED_FIRING_PATTERN, Peddy.Handle, Function.Call<int>(Hash.GET_HASH_KEY, "FIRING_PATTERN_BURST_FIRE_HELI"));
+            Peddy.AlwaysKeepTask = true;
+            Peddy.BlockPermanentEvents = true;
         }
         private void LaserFighter(Ped Peddy, int iPed)
         {
-            Vehicle vPlane = VehicleSpawn(RandVeh(12), new Vector3(Peddy.Position.X, Peddy.Position.Y, Peddy.Position.Z + 1550.00f), 0.00f, false, 0, 12);
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("LaserFighter, iPed == " + iPed, tEx);
+
+            ClearPedBlips(iPed);
+            string sVeh = RandVeh(12);
+            Vehicle vPlane = VehicleSpawn(sVeh, new Vector3(Peddy.Position.X, Peddy.Position.Y, Peddy.Position.Z + 1550.00f), 0.00f, false, false);
             WarptoAnyVeh(vPlane, Peddy, -1);
             PedList[iPed].ThisVeh = vPlane;
+            PedList[iPed].ThisBlip = PedBlimp(Peddy, 424, PedList[iPed].sMyName, false);
             Function.Call(Hash.TASK_PLANE_MISSION, Peddy, vPlane, 0, Game.Player.Character.Handle, 0, 0, 0, 6, 0.0f, 0.0f, 180.0f, 1000.0f, -5000.0f);
             Function.Call(Hash.SET_PED_FLEE_ATTRIBUTES, Peddy, 0, true);
             Peddy.AlwaysKeepTask = true;
@@ -1478,17 +1597,9 @@ namespace OnlinePlayerz
             float dy = Pedd.Position.Y - HeliDesY;
             float HeliDirect = Function.Call<float>(Hash.GET_HEADING_FROM_VECTOR_2D, dx, dy) - 180.00f;
             Function.Call(Hash.TASK_HELI_MISSION, Pedd.Handle, vHeli.Handle, 0, 0, HeliDesX, HeliDesY, HeliDesZ, 9, HeliSpeed, HeliLandArea, HeliDirect, -1, -1, -1, 0);
-            //Pedd.AlwaysKeepTask = true;
-            //Pedd.BlockPermanentEvents = true;
+            Pedd.AlwaysKeepTask = true;
+            Pedd.BlockPermanentEvents = true;
         }
-        private void CombatMoves(Ped Peddy)
-        {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("CombatMoves ", tEx);
-
-            Function.Call(Hash.SET_PED_AS_GROUP_MEMBER, Peddy.Handle, WarringNPCs);
-            Function.Call(Hash.SET_PED_PATH_CAN_USE_CLIMBOVERS, Peddy.Handle, true);
-        }//---Addsomething here
         private void HotPersute(Ped Peddy)
         {
             using (StreamWriter tEx = File.AppendText(sBeeLogs))
@@ -1497,8 +1608,28 @@ namespace OnlinePlayerz
             Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, Peddy);
 
         }
+        private void ClearPedBlips(int iPed)
+        {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("ClearPedBlips, iPed == " + iPed, tEx);
+
+            PlayerBrain PeBrain = PedList[iPed];
+            if (PeBrain.ThisBlip != null)
+            {
+                PeBrain.ThisBlip.Remove();
+                PeBrain.ThisBlip = null;
+            }
+            if (PeBrain.DirBlip != null)
+            {
+                PeBrain.DirBlip.Remove();
+                PeBrain.DirBlip = null;
+            }
+        }
         public int NearHiest(bool bLaunch)
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("NearHiest, bLaunch == " + bLaunch, tEx);
+
             int iNear = -1;
             List<Vector3> VectorList = new List<Vector3>();
             VectorList.Add(new Vector3(-1105.577f, -1692.11f, 4.345489f));      //0
@@ -1523,6 +1654,9 @@ namespace OnlinePlayerz
         }
         private void HeistDrips(int iMyArea)
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("HeistDrips, iMyArea == " + iMyArea, tEx);
+
             List<Vector3> VectorList = new List<Vector3>();
 
             if (iMyArea == 0)
@@ -1562,11 +1696,17 @@ namespace OnlinePlayerz
             }
 
             for (int i = 0; i < VectorList.Count; i++)
-                GenPlayerPed(VectorList[i], 90.00f, 1, null, 0);
+                GenPlayerPed(VectorList[i], 90.00f, null, 0, -1);
 
             Script.Wait(1200);
             World.AddExplosion(VectorList[0], ExplosionType.Grenade, 7.00f, 15.00f, true, false);
             bHeistPop = false;
+        }
+        private void CeoBikersGreaf()
+        {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("CeoBikersGreaf", tEx);
+
         }
         public Blip DirectionalBlimp(Ped pEdd)
         {
@@ -1577,7 +1717,7 @@ namespace OnlinePlayerz
             Function.Call(Hash.SET_BLIP_SPRITE, MyBlip.Handle, 399);
             Function.Call(Hash.SET_BLIP_AS_SHORT_RANGE, MyBlip.Handle, true);
             Function.Call(Hash.SET_BLIP_PRIORITY, MyBlip.Handle, 1);
-            Function.Call(Hash.SET_BLIP_COLOUR, MyBlip.Handle, 58);
+            Function.Call(Hash.SET_BLIP_COLOUR, MyBlip.Handle, 85);
             Function.Call(Hash.SET_BLIP_DISPLAY, MyBlip.Handle, 8);
 
             return MyBlip;
@@ -1611,6 +1751,9 @@ namespace OnlinePlayerz
         }
         public Blip LocalBlip(Vector3 Vlocal, int iBlippy, string sName)
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("LocalBlip, iBlippy == " + iBlippy, tEx);
+
             Blip MyBlip = Function.Call<Blip>(Hash.ADD_BLIP_FOR_COORD, Vlocal.X, Vlocal.Y, Vlocal.Z);
             Function.Call(Hash.SET_BLIP_SPRITE, MyBlip.Handle, iBlippy);
             Function.Call(Hash.SET_BLIP_AS_SHORT_RANGE, MyBlip.Handle, true);
@@ -1627,7 +1770,8 @@ namespace OnlinePlayerz
         private void BlipDirect(Blip Blippy, float fDir)
         {
             int iHead = (int)fDir;
-            Function.Call(Hash.SET_BLIP_ROTATION, Blippy.Handle, iHead);
+            if (Blippy.Exists())
+                Function.Call(Hash.SET_BLIP_ROTATION, Blippy.Handle, iHead);
         }
         private void GunningIt(Ped Peddy)
         {
@@ -1720,131 +1864,202 @@ namespace OnlinePlayerz
             for (int i = 0; i < sWeapList.Count; i++)
                 Function.Call(Hash.GIVE_WEAPON_TO_PED, Peddy, Function.Call<int>(Hash.GET_HASH_KEY, sWeapList[i]), 9999, false, true);
         }
-        private void NpcBrains(Ped Peddy, int iBrain)
+        private void NpcBrains(Ped Peddy, Vehicle VeHic, int iSeat, PedFixtures Fixtures, int iReload)
         {
             using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("NpcBrains, iBrain == " + iBrain, tEx);
+                BeeLog("NpcBrains, iSeat == " + iSeat + ", iReload == " + iReload, tEx);
 
-            PlayerBrain MyBrains = new PlayerBrain();
-
-            MyBrains.ThisPed = Peddy;
-            MyBrains.iBrain = iBrain;
-            MyBrains.iDeathSequence = 0;
-            MyBrains.iDeathTime = 0;
-            MyBrains.iTimeOn = Game.GameTime + RandInt(iMinSession, iMaxSession);
-            MyBrains.sMyName = SillyNameList();
-            MyBrains.iLevel = LessRandomz(1, 400, 11);
-            MyBrains.iKilled = 0;
-            MyBrains.iKills = 0;
-            MyBrains.iFindPlayer = 0;
-            MyBrains.bInCombat = false;
-            MyBrains.bBounty = false;
-            MyBrains.bHorny = false;
-            MyBrains.bHorny2 = true;
-            MyBrains.bFollower = false;
-            MyBrains.bOverFriendly = false;
-            MyBrains.DirBlip = null;
-            MyBrains.ThisVeh = null;
-
-            Function.Call(Hash.SET_PED_CAN_SWITCH_WEAPON, Peddy.Handle, true);
-            Function.Call(Hash.SET_PED_COMBAT_MOVEMENT, Peddy.Handle, 2);
-            Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 0, true);
-            Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 1, true);
-            Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 2, true);
-            Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 3, true);
-            Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 52, true);
-
-            if (iBrain == 1)
+            if (Fixtures == null)
             {
-                if (iAggression < 7)
+                PedList[iReload].ThisPed = Peddy;
+                PedList[iReload].DirBlip = DirectionalBlimp(Peddy);
+                PedList[iReload].ThisBlip = PedBlimp(Peddy, 1, PedList[iReload].sMyName, PedList[iReload].bFriendly);
+
+                Function.Call(Hash.SET_PED_CAN_SWITCH_WEAPON, Peddy.Handle, true);
+                Function.Call(Hash.SET_PED_COMBAT_MOVEMENT, Peddy.Handle, 2);
+                Function.Call(Hash.SET_PED_PATH_CAN_USE_CLIMBOVERS, Peddy.Handle, true);
+                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 0, true);
+                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 1, true);
+                if (iAggression > 2)
+                    Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 2, true);
+                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 3, true);
+                Peddy.CanBeTargetted = true;
+
+                if (!PedList[iReload].bFriendly)
+                    FightPlayer(Peddy, false);
+                else
+                {
+                    if (PedList[iReload].bFollower)
+                        FolllowTheLeader(Peddy);
+                    else
+                        Peddy.Task.WanderAround();
+                }
+
+                GunningIt(Peddy);
+            }
+            else
+            {
+                PlayerBrain MyBrains = new PlayerBrain();
+
+                MyBrains.ThisPed = Peddy;
+                MyBrains.iDeathSequence = 0;
+                MyBrains.iDeathTime = 0;
+                MyBrains.iTimeOn = Game.GameTime + RandInt(iMinSession, iMaxSession);
+                MyBrains.sMyName = SillyNameList();
+                MyBrains.iLevel = LessRandomz(1, 400, 11);
+                MyBrains.iKilled = 0;
+                MyBrains.iKills = 0;
+                MyBrains.iFindPlayer = 0;
+                MyBrains.bFriendly = true;
+                MyBrains.bInCombat = false;
+                MyBrains.bBounty = false;
+                MyBrains.bHorny = false;
+                MyBrains.bHorny2 = false;
+                MyBrains.bFollower = false;
+                MyBrains.bSessionJumper = false;
+                MyBrains.bApprochPlayer = false;
+                MyBrains.bDriver = false;
+                MyBrains.bPassenger = false;
+                MyBrains.DirBlip = null;
+
+                if (iSeat == -1)
+                    MyBrains.ThisVeh = VeHic;
+                else
+                    MyBrains.ThisVeh = null;
+
+                Function.Call(Hash.SET_PED_CAN_SWITCH_WEAPON, Peddy.Handle, true);
+                Function.Call(Hash.SET_PED_COMBAT_MOVEMENT, Peddy.Handle, 2);
+                Function.Call(Hash.SET_PED_PATH_CAN_USE_CLIMBOVERS, Peddy.Handle, true);
+                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 0, true);
+                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 1, true);
+                if (iAggression > 2)
+                    Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 2, true);
+                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 3, true);
+                Peddy.CanBeTargetted = true;
+                //Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 52, true);
+
+                int iBrain = 0;
+                if (iAggression < 3)
+                {
+                    iBrain = LessRandomz(0, 40, 0);
+                    if (iBrain < 5)
+                        iBrain = 2;
+                    else
+                        iBrain = 1;
+                }
+                else if (iAggression < 7)
+                {
+                    iBrain = LessRandomz(0, 40, 0);
+                    if (iBrain < 5)
+                        iBrain = 2;
+                    else if (iBrain < 15)
+                        iBrain = 3;
+                    else
+                        iBrain = 1;
+                }
+                else
+                    iBrain = 3;
+
+                if (iBrain == 1)
                 {
                     Peddy.Task.WanderAround();
                     MyBrains.DirBlip = DirectionalBlimp(Peddy);
                     MyBrains.ThisBlip = PedBlimp(Peddy, 1, MyBrains.sMyName, true);
-                    MyBrains.bFriendly = true;
-                    MyBrains.bSessionJumper = false;
-                }
-                else
+                    Function.Call(Hash.SET_PED_AS_GROUP_MEMBER, Peddy.Handle, iFollowingNPCs);
+                }            //Friend
+                else if (iBrain == 2)
+                {
+                    Peddy.Task.WanderAround();
+                    MyBrains.DirBlip = DirectionalBlimp(Peddy);
+                    MyBrains.ThisBlip = PedBlimp(Peddy, 1, MyBrains.sMyName, true);
+                    MyBrains.bSessionJumper = true;
+                }       //Disconect
+                else 
                 {
                     FightPlayer(Peddy, false);
                     MyBrains.DirBlip = DirectionalBlimp(Peddy);
-                    MyBrains.ThisBlip = PedBlimp(Peddy, 1, MyBrains.sMyName, true);
+                    MyBrains.ThisBlip = PedBlimp(Peddy, 1, MyBrains.sMyName, false);
                     MyBrains.bFriendly = false;
-                    MyBrains.bSessionJumper = false;
-                    MyBrains.iLevel = 420;
-                }
-            }       //Friendly or Not
-            else if (iBrain == 2)
-            {
-                Peddy.Task.WanderAround();
-                MyBrains.DirBlip = DirectionalBlimp(Peddy);
-                MyBrains.ThisBlip = PedBlimp(Peddy, 1, MyBrains.sMyName, true);
-                MyBrains.bFriendly = true;
-                MyBrains.bSessionJumper = false;
-            }       //Friendly
-            else if (iBrain == 3)
-            {
-                FightPlayer(Peddy, false);
-                MyBrains.ThisBlip = PedBlimp(Peddy, 303, MyBrains.sMyName, false);
-                MyBrains.bBounty = true;
-                MyBrains.bFriendly = false;
-                MyBrains.bSessionJumper = false;
-                MyBrains.iLevel = 9999;
-            }       //Chaos
-            else if (iBrain == 4)
-            {
-                Peddy.Task.WanderAround();
-                MyBrains.DirBlip = DirectionalBlimp(Peddy);
-                MyBrains.ThisBlip = PedBlimp(Peddy, 1, MyBrains.sMyName, true);
-                MyBrains.bFriendly = true;
-                MyBrains.bSessionJumper = true;
-            }       //Gets close disconects
-            else if (iBrain == 5)
-            {
-                DriveTooo(Peddy, false);
-                MyBrains.ThisBlip = PedBlimp(Peddy, 225, MyBrains.sMyName, true);
-                MyBrains.bFriendly = true;
-                MyBrains.bHorny = true;
-                MyBrains.bSessionJumper = false;
-                MyBrains.bOverFriendly = true;
-                if (MyBrains.ThisPed.IsInVehicle())
-                    MyBrains.ThisVeh = MyBrains.ThisPed.CurrentVehicle;
-                MyBrains.ThisPed.CanBeDraggedOutOfVehicle = false;
-                //build car show locals
-            }       //CarShow
-            else if (iBrain == 6)
-            {
-                CombatMoves(Peddy);
-                FightPlayer(Peddy, true);
-                Peddy.Task.FightAgainst(Game.Player.Character);
-                Peddy.AlwaysKeepTask = true;
-                MyBrains.ThisBlip = PedBlimp(Peddy, 303, MyBrains.sMyName, false);
-                MyBrains.bBounty = true;
-                MyBrains.bFriendly = false;
-                MyBrains.bSessionJumper = false;
-                if (MyBrains.ThisPed.IsInVehicle())
+                    Function.Call(Hash.SET_PED_AS_GROUP_MEMBER, Peddy.Handle, iWarringNPCs);
+                }                        //Enemy
+
+                if (VeHic != null)
                 {
-                    MyBrains.ThisVeh = MyBrains.ThisPed.CurrentVehicle;
-                    Function.Call(Hash.SET_VEHICLE_IS_WANTED, MyBrains.ThisPed.CurrentVehicle, true);
-                    DriveTooo(Peddy, true);
+                    WarptoAnyVeh(VeHic, Peddy, iSeat);
+                    if (iSeat == -1)
+                    {
+                        if (MyBrains.ThisBlip != null)
+                        {
+                            MyBrains.ThisBlip.Remove();
+                            MyBrains.ThisBlip = null;
+                        }
+                        if (MyBrains.DirBlip != null)
+                        {
+                            MyBrains.DirBlip.Remove();
+                            MyBrains.DirBlip = null;
+                        }
+                        DriveTooo(Peddy, !MyBrains.bFriendly);
+                        int iClass = 0;
+                        if (VeHic.ClassType == VehicleClass.Helicopters)
+                            iClass = 422;
+                        else if (VeHic.ClassType == VehicleClass.Motorcycles)
+                            iClass = 348;
+                        else if (VeHic.ClassType == VehicleClass.Planes)
+                            iClass = 424;
+                        else
+                            iClass = 225;
+                        MyBrains.ThisBlip = PedBlimp(Peddy, OhMyBlip(VeHic.Model.Hash, iClass), MyBrains.sMyName, MyBrains.bFriendly);
+
+                        if (MyBrains.bFriendly)
+                            MyBrains.ThisPed.CanBeDraggedOutOfVehicle = false;
+                        else
+                            Function.Call(Hash.SET_VEHICLE_IS_WANTED, VeHic, true);
+
+                        MyBrains.bApprochPlayer = true;
+                        MyBrains.bDriver = true;
+                    }
+                    else
+                    {
+                        if (MyBrains.ThisBlip != null)
+                        {
+                            MyBrains.ThisBlip.Remove();
+                            MyBrains.ThisBlip = null;
+                        }
+                        if (MyBrains.DirBlip != null)
+                        {
+                            MyBrains.DirBlip.Remove();
+                            MyBrains.DirBlip = null;
+                        }
+                        MyBrains.bPassenger = true;
+                    }
                 }
-            }       //CarAttack
-            else
-            {
-                DriveAround(Peddy);
-                MyBrains.ThisBlip = PedBlimp(Peddy, 225, MyBrains.sMyName, true);
-                MyBrains.bFriendly = true;
-                MyBrains.bSessionJumper = true;
-                if (MyBrains.ThisPed.IsInVehicle())
-                    MyBrains.ThisVeh = MyBrains.ThisPed.CurrentVehicle;
-            }       //DriveAwayFrom
+                else if (RandInt(0, 40) < 5 && iAggression > 5)
+                {
+                    if (MyBrains.ThisBlip != null)
+                    {
+                        MyBrains.ThisBlip.Remove();
+                        MyBrains.ThisBlip = null;
+                    }
+                    if (MyBrains.DirBlip != null)
+                    {
+                        MyBrains.DirBlip.Remove();
+                        MyBrains.DirBlip = null;
+                    }
+                    MyBrains.ThisBlip = PedBlimp(Peddy, 303, MyBrains.sMyName, false);
+                    MyBrains.bBounty = true;
+                }
 
+                MyBrains.PFMySetting = Fixtures;
 
-            PedList.Add(MyBrains);
+                PedList.Add(MyBrains);
 
-            BackItUpBrain();
+                BackItUpBrain();
 
-            iCurrentPlayerz += 1;
+                if (iAggression > 1)
+                    GunningIt(Peddy);
+
+                iCurrentPlayerz += 1;
+            }
         }
         public class PlayerBrain
         {
@@ -1854,7 +2069,6 @@ namespace OnlinePlayerz
             public Blip DirBlip { get; set; }
             public int iDeathSequence { get; set; }
             public int iDeathTime { get; set; }
-            public int iBrain { get; set; }
             public int iTimeOn { get; set; }
             public int iLevel { get; set; }
             public int iKills { get; set; }
@@ -1863,12 +2077,15 @@ namespace OnlinePlayerz
             public bool bInCombat { get; set; }
             public bool bFriendly { get; set; }
             public bool bFollower { get; set; }
-            public bool bOverFriendly { get; set; }
+            public bool bApprochPlayer { get; set; }
             public bool bSessionJumper { get; set; }
             public bool bHorny { get; set; }
             public bool bHorny2 { get; set; }
+            public bool bDriver { get; set; }
+            public bool bPassenger { get; set; }
             public int iFindPlayer { get; set; }
             public string sMyName { get; set; }
+            public PedFixtures PFMySetting { get; set; }
         }
         public class AfkPlayer
         {
@@ -1899,6 +2116,7 @@ namespace OnlinePlayerz
         public class BackUpBrain
         {
             public List<int> BigBrain { get; set; }
+            public List<int> BigVeh { get; set; }
             public List<int> BigBlip { get; set; }
             public List<int> BigDirBlip { get; set; }
             public List<int> BigAFKBlip { get; set; }
@@ -1933,6 +2151,7 @@ namespace OnlinePlayerz
                 BeeLog("BackItUpBrain", tEx);
 
             BlowenMyBrains.BigBrain.Clear();
+            BlowenMyBrains.BigVeh.Clear();
             BlowenMyBrains.BigBlip.Clear();
             BlowenMyBrains.BigDirBlip.Clear();
             BlowenMyBrains.BigAFKBlip.Clear();
@@ -1940,7 +2159,12 @@ namespace OnlinePlayerz
             for (int i = 0; i < PedList.Count; i++)
             {
                 BlowenMyBrains.BigBrain.Add(PedList[i].ThisPed.Handle);
-                BlowenMyBrains.BigBlip.Add(PedList[i].ThisBlip.Handle);
+
+                if (PedList[i].ThisVeh != null)
+                    BlowenMyBrains.BigVeh.Add(PedList[i].ThisVeh.Handle);
+
+                if (PedList[i].ThisBlip != null)
+                    BlowenMyBrains.BigBlip.Add(PedList[i].ThisBlip.Handle);
 
                 if (PedList[i].DirBlip != null)
                     BlowenMyBrains.BigDirBlip.Add(PedList[i].DirBlip.Handle);
@@ -1959,37 +2183,47 @@ namespace OnlinePlayerz
                 BlowenMyBrains = LoadPlayerBrain(sMemory);
 
                 for (int i = 0; i < BlowenMyBrains.BigBrain.Count; i++)
-                    FlushBrains(BlowenMyBrains.BigBrain[i] , true);
+                    FlushBrains(BlowenMyBrains.BigBrain[i] , 1);
+
+                for (int i = 0; i < BlowenMyBrains.BigVeh.Count; i++)
+                    FlushBrains(BlowenMyBrains.BigVeh[i], 2);
 
                 for (int i = 0; i < BlowenMyBrains.BigBlip.Count; i++)
-                    FlushBrains(BlowenMyBrains.BigBlip[i], false);
+                    FlushBrains(BlowenMyBrains.BigBlip[i], 0);
 
                 for (int i = 0; i < BlowenMyBrains.BigDirBlip.Count; i++)
-                    FlushBrains(BlowenMyBrains.BigDirBlip[i], false);
+                    FlushBrains(BlowenMyBrains.BigDirBlip[i], 0);
 
                 for (int i = 0; i < BlowenMyBrains.BigAFKBlip.Count; i++)
-                    FlushBrains(BlowenMyBrains.BigAFKBlip[i], false);
+                    FlushBrains(BlowenMyBrains.BigAFKBlip[i], 0);
 
                 using (StreamWriter tEx = File.AppendText(sBeeLogs))
                     BeeLog("FoundOldXML", tEx);
             }
         }
-        private void FlushBrains(int iHandles, bool bBrain)
+        private void FlushBrains(int iHandles, int iType)
         {
             using (StreamWriter tEx = File.AppendText(sBeeLogs))
                 BeeLog("FlushBrains", tEx);
 
             unsafe
             {
-                if (bBrain)
+                if (iType == 1)
                 {
                     if (Function.Call<bool>(Hash.DOES_ENTITY_EXIST, iHandles))
                     {
                         Ped Peed = new Ped(iHandles);
-                        Peed.CurrentBlip.Remove();
                         Peed.Delete();
                     }
 
+                }
+                else if (iType == 2)
+                {
+                    if (Function.Call<bool>(Hash.DOES_ENTITY_EXIST, iHandles))
+                    {
+                        Vehicle Peed = new Vehicle(iHandles);
+                        Peed.Delete();
+                    }
                 }
                 else
                 {
@@ -2003,9 +2237,12 @@ namespace OnlinePlayerz
         }
         private void LaggOut()
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("LaggOut", tEx);
+
             for (int i = 0; i < PedList.Count; i++)
             {
-                GetOutVehicle(PedList[i].ThisPed);
+                GetOutVehicle(PedList[i].ThisPed, i);
                 PedCleaning(i, "left", false);
             }
 
@@ -2015,8 +2252,125 @@ namespace OnlinePlayerz
                 iCurrentPlayerz -= 1;
             }
         }
+        public int OhMyBlip(int iVehHash, int iBeLip)
+        {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("OhMyBlip, iVehHash == " + iVehHash, tEx);
+
+            if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "CRUSADER"))
+                iBeLip = 800;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "SLAMVAN3"))
+                iBeLip = 799;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "VALKYRIE2") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "VALKYRIE"))
+                iBeLip = 759;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "SQUADDIE"))
+                iBeLip = 757;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "seasparrow2"))
+                iBeLip = 753;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "WINKY"))
+                iBeLip = 745;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "ZHABA"))
+                iBeLip = 737;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "OUTLAW"))
+                iBeLip = 735;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "VAGRANT"))
+                iBeLip = 736;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "ZR380") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "ZR3802") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "ZR3803"))
+                iBeLip = 669;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "SLAMVAN4") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "SLAMVAN5") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "SLAMVAN6"))
+                iBeLip = 668;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "SCARAB") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "SCARAB2") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "SCARAB3"))
+                iBeLip = 667;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "MONSTER3") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "MONSTER4") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "MONSTER5"))
+                iBeLip = 666;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "ISSI4") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "ISSI5") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "ISSI6"))
+                iBeLip = 665;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "IMPERATOR") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "IMPERATOR2") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "IMPERATOR3"))
+                iBeLip = 664;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "IMPALER2") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "IMPALER3") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "IMPALER4"))
+                iBeLip = 663;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "DOMINATOR4") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "DOMINATOR5") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "DOMINATOR6"))
+                iBeLip = 662;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "CERBERUS") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "CERBERUS2") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "CERBERUS3"))
+                iBeLip = 660;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "BRUTUS") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "BRUTUS2") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "BRUTUS3"))
+                iBeLip = 659;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "BRUISER") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "BRUISER2") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "BRUISER3"))
+                iBeLip = 658;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "STRIKEFORCE"))
+                iBeLip = 640;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "OPPRESSOR2"))
+                iBeLip = 639;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "SCRAMJET"))
+                iBeLip = 634;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "seasparrow"))
+                iBeLip = 612;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "APC"))
+                iBeLip = 603;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "akula"))
+                iBeLip = 602;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "volatol"))
+                iBeLip = 600;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "KHANJALI"))
+                iBeLip = 598;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "DELUXO"))
+                iBeLip = 596;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "bombushka"))
+                iBeLip = 585;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "seabreeze"))
+                iBeLip = 584;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "STARLING"))
+                iBeLip = 583;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "ROGUE"))
+                iBeLip = 582;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "PYRO"))
+                iBeLip = 581;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "nokota"))
+                iBeLip = 580;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "MOLOTOK"))
+                iBeLip = 579;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "mogul"))
+                iBeLip = 578;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "microlight"))
+                iBeLip = 577;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "HUNTER"))
+                iBeLip = 576;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "howard"))
+                iBeLip = 575;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "havok"))
+                iBeLip = 574;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "tula"))
+                iBeLip = 573;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "alphaz1"))
+                iBeLip = 572;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "DUNE3"))
+                iBeLip = 561;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "HALFTRACK"))
+                iBeLip = 560;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "OPPRESSOR"))
+                iBeLip = 559;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "TECHNICAL2"))
+                iBeLip = 534;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "voltic2"))
+                iBeLip = 533;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "wastelander"))
+                iBeLip = 532;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "DUNE4") || iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "DUNE5"))
+                iBeLip = 531;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "RUINER2"))
+                iBeLip = 530;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "PHANTOM2"))
+                iBeLip = 528;
+            else if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "RHINO"))
+                iBeLip = 421;
+
+            return iBeLip;
+        }
         public int WhoShotMe(Ped MeDie)
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("WhoShotMe", tEx);
+
             int iShoot = -1;
 
             for (int i = 0; i < PedList.Count; i++)
@@ -2029,7 +2383,49 @@ namespace OnlinePlayerz
             }
             return iShoot;
         }
-        private void OnlineFaceTypes(Ped Pedx, bool bMale)
+        public class PedFixtures
+        {
+            public bool PFMale { get; set; }
+
+            public int PFshapeFirstID { get; set; }
+            public int PFshapeSecondID { get; set; }
+            public int PFshapeThirdID { get; set; }
+            public int PFskinFirstID { get; set; }
+            public int PFskinSecondID { get; set; }
+            public int PFskinThirdID { get; set; }
+            public float PFshapeMix { get; set; }
+            public float PFskinMix { get; set; }
+            public float PFthirdMix { get; set; }
+
+            public List<int> PFFeature { get; set; }
+            public List<int> PFChange { get; set; }
+            public List<int> PFColour { get; set; }
+            public List<int> PFHeadColour { get; set; }
+            public List<float> PFAmount { get; set; }
+
+            public int PFHair01 { get; set; }
+            public int PFHair02 { get; set; }
+
+            public List<int> PFClothA { get; set; }
+            public List<int> PFClothB { get; set; }
+
+            public List<int> PFExtraA { get; set; }
+            public List<int> PFExtraB { get; set; }
+
+            public PedFixtures()
+            {
+                PFFeature = new List<int>();
+                PFChange = new List<int>();
+                PFColour = new List<int>();
+                PFHeadColour = new List<int>();
+                PFAmount = new List<float>();
+                PFClothA = new List<int>();
+                PFClothB = new List<int>();
+                PFExtraA = new List<int>();
+                PFExtraB = new List<int>();
+            }
+        }
+        private void OnlineFaceTypes(Ped Pedx, bool bMale, Vehicle vMyCar, int iSeat, PedFixtures Fixtures, int iReload)
         {
             using (StreamWriter tEx = File.AppendText(sBeeLogs))
                 BeeLog("OnlineFaceTypes", tEx);
@@ -2067,37 +2463,63 @@ namespace OnlinePlayerz
             skinMix = RandFlow(0.9f, 0.99f);
             thirdMix = RandFlow(-0.9f, 0.9f);
 
+            if (Fixtures != null)
+            {
+                Fixtures.PFshapeFirstID = shapeFirstID;
+                Fixtures.PFshapeSecondID = shapeSecondID;
+                Fixtures.PFshapeThirdID = shapeThirdID;
+                Fixtures.PFskinFirstID = skinFirstID;
+                Fixtures.PFskinSecondID = skinSecondID;
+                Fixtures.PFskinThirdID = skinThirdID;
+                Fixtures.PFshapeMix = shapeMix;
+                Fixtures.PFskinMix = skinMix;
+                Fixtures.PFthirdMix = thirdMix;
+            }
+            else
+            {
+                shapeFirstID = PedList[iReload].PFMySetting.PFshapeFirstID;
+                shapeSecondID = PedList[iReload].PFMySetting.PFshapeSecondID;
+                shapeThirdID = PedList[iReload].PFMySetting.PFshapeThirdID;
+                skinFirstID = PedList[iReload].PFMySetting.PFskinFirstID;
+                skinSecondID = PedList[iReload].PFMySetting.PFskinSecondID;
+                skinThirdID = PedList[iReload].PFMySetting.PFskinThirdID;
+                shapeMix = PedList[iReload].PFMySetting.PFshapeMix;
+                skinMix = PedList[iReload].PFMySetting.PFskinMix;
+                thirdMix = PedList[iReload].PFMySetting.PFthirdMix;
+            }
+
             Function.Call(Hash.SET_PED_HEAD_BLEND_DATA, Pedx.Handle, shapeFirstID, shapeSecondID, shapeThirdID, skinFirstID, skinSecondID, skinThirdID, shapeMix, skinMix, thirdMix, isParent);
 
-            int iFeature = 12;
-            while (iFeature > 0)
+            int iFeature = 0;
+
+            while (iFeature < 12)
             {
-                iFeature = iFeature - 1;
                 int iColour = 0;
                 int iChange = RandInt(0, Function.Call<int>(Hash._GET_NUM_HEAD_OVERLAY_VALUES, iFeature));
                 float fVar = RandFlow(0.45f, 0.99f);
-                if (iFeature == 0)//Blemishes
+
+                if (iFeature == 0)
                 {
                     iChange = RandInt(0, iChange);
-                }
-                else if (iFeature == 1)//Facial Hair
+                }//Blemishes
+                else if (iFeature == 1)
                 {
                     if (bMale)
                         iChange = RandInt(0, iChange);
                     else
                         iChange = 255;
                     iColour = 1;
-                }
-                else if (iFeature == 2)//Eyebrows
+                }//Facial Hair
+                else if (iFeature == 2)
                 {
                     iChange = RandInt(0, iChange);
                     iColour = 1;
-                }
-                else if (iFeature == 3)//Ageing
+                }//Eyebrows
+                else if (iFeature == 3)
                 {
                     iChange = 255;
-                }
-                else if (iFeature == 4)//Makeup
+                }//Ageing
+                else if (iFeature == 4)
                 {
                     if (RandInt(0, 50) < 40)
                     {
@@ -2105,260 +2527,643 @@ namespace OnlinePlayerz
                     }
                     else
                         iChange = 255;
-                }
-                else if (iFeature == 5)//Blush
+                }//Makeup
+                else if (iFeature == 5)
                 {
                     if (!bMale)
                         iChange = RandInt(0, iChange);
                     else
                         iChange = 255;
                     iColour = 2;
-                }
-                else if (iFeature == 6)//Complexion
+                }//Blush
+                else if (iFeature == 6)
                 {
                     iChange = RandInt(0, iChange);
-                }
-                else if (iFeature == 7)//Sun Damage
+                }//Complexion
+                else if (iFeature == 7)
                 {
                     iChange = 255;
-                }
-                else if (iFeature == 8)//Lipstick
+                }//Sun Damage
+                else if (iFeature == 8)
                 {
                     if (!bMale)
                         iChange = RandInt(0, iChange);
                     else
                         iChange = 255;
                     iColour = 2;
-                }
-                else if (iFeature == 9)//Moles/Freckles
+                }//Lipstick
+                else if (iFeature == 9)
                 {
                     iChange = RandInt(0, iChange);
-                }
-                else if (iFeature == 10)//Chest Hair
+                }//Moles/Freckles
+                else if (iFeature == 10)
                 {
                     if (bMale)
                         iChange = RandInt(0, iChange);
                     else
                         iChange = 255;
                     iColour = 1;
-                }
-                else if (iFeature == 11)//Body Blemishes
+                }//Chest Hair
+                else if (iFeature == 11)
                 {
                     iChange = RandInt(0, iChange);
+                }//Body Blemishes
+
+                int AddColour = RandInt(0, 64);
+
+                if (Fixtures != null)
+                {
+                    Fixtures.PFFeature.Add(iChange);
+                    Fixtures.PFColour.Add(AddColour);
+                    Fixtures.PFAmount.Add(fVar);
                 }
+                else
+                {
+                    iChange = PedList[iReload].PFMySetting.PFFeature[iFeature];
+                    AddColour = PedList[iReload].PFMySetting.PFColour[iFeature];
+                    fVar = PedList[iReload].PFMySetting.PFAmount[iFeature];
+                }
+
                 Function.Call(Hash.SET_PED_HEAD_OVERLAY, Pedx.Handle, iFeature, iChange, fVar);
 
                 if (iColour > 0)
-                    Function.Call(Hash._SET_PED_HEAD_OVERLAY_COLOR, Pedx.Handle, iFeature, iColour, RandInt(0, 64), 0);
+                    Function.Call(Hash._SET_PED_HEAD_OVERLAY_COLOR, Pedx.Handle, iFeature, iColour, AddColour, 0);
 
                 int iCount = Function.Call<int>(Hash.GET_NUMBER_OF_PED_DRAWABLE_VARIATIONS, Game.Player.Character, 2);
                 int iAm = RandInt(1, iCount);
                 while (iAm == 24)
                     iAm = RandInt(1, iCount);
+
+                if (Fixtures != null)
+                    Fixtures.PFHeadColour.Add(iAm);
+                else
+                    iAm = PedList[iReload].PFMySetting.PFHeadColour[iFeature];
+
                 Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 2, iAm, 0, 2);//hair
+
+                iFeature += 1;
             }
             int iHair = RandInt(0, Function.Call<int>(Hash._GET_NUM_HAIR_COLORS));
             int iHair2 = RandInt(0, Function.Call<int>(Hash._GET_NUM_HAIR_COLORS));
-            Function.Call(Hash._SET_PED_HAIR_COLOR, Pedx.Handle, iHair, iHair2);
-        }
-        private void OnlineWardrobe(Ped Pedx, bool bMale)
-        {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("OnlineWardrobe", tEx);
 
-            if (bMale)
+            if (Fixtures != null)
             {
-                if (MaleCloth.Count > 0)
-                {
-                    Function.Call(Hash.CLEAR_ALL_PED_PROPS, Pedx);
-                    ClothBank MyWard = MaleCloth[RandInt(0, MaleCloth.Count - 1)];
-                    OnlineSavedWard(Pedx, MyWard);
-                }
-                else
-                {
-                    int RanChar = RandInt(1, 6);
-                    if (RanChar == 1)
-                    {
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 1, 0, 0, 2);//mask
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 2, 12, 4, 2);//hair
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 3, 1, 0, 2);//Torso
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 4, 1, 5, 2);//Legs
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 5, 0, 0, 2);//Hands
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 6, 65, 3, 2);//shoes
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 7, 0, 0, 2);//Scarf
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 8, 22, 4, 2);//AccTop
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 9, 0, 0, 2);//Armor
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 10, 0, 0, 2);//Emb--not used
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 11, 11, 0, 2);//Top2
-                    }
-                    else if (RanChar == 2)
-                    {
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 1, 0, 0, 2);//mask
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 2, 14, 3, 2);//hair
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 3, 0, 0, 2);//Torso
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 4, 17, 0, 2);//Legs
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 5, 23, 4, 2);//Hands
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 6, 40, 1, 2);//shoes
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 7, 0, 0, 2);//Scarf
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 8, 26, 3, 2);//AccTop
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 9, 0, 0, 2);//Armor
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 10, 0, 0, 2);//Emb--not used
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 11, 35, 0, 2);//Top2
-                    }
-                    else if (RanChar == 3)
-                    {
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 1, 147, 0, 2);//mask
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 2, 0, 0, 2);//hair
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 3, 167, 0, 2);//Torso
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 4, 33, 0, 2);//Legs
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 5, 0, 0, 2);//Hands
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 6, 36, 1, 2);//shoes
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 7, 0, 0, 2);//Scarf
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 8, -1, 0, 2);//AccTop
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 9, 0, 0, 2);//Armor
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 10, 0, 0, 2);//Emb--not used
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 11, 289, 0, 2);//Top2
-                    }
-                    else if (RanChar == 4)
-                    {
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 1, 0, 0, 2);//mask
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 2, 11, 4, 2);//hair
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 3, 19, 0, 2);//Torso
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 4, 88, 7, 2);//Legs
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 5, 0, 0, 2);//Hands
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 6, 14, 2, 2);//shoes
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 7, 0, 0, 2);//Scarf
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 8, -1, 0, 2);//AccTop
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 9, 0, 0, 2);//Armor
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 10, 0, 0, 2);//Emb--not used
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 11, 273, 15, 2);//Top2
-                    }
-                    else if (RanChar == 5)
-                    {
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 1, 125, 0, 2);//mask
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 2, 0, 0, 2);//hair
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 3, -1, 0, 2);//Torso
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 4, 114, 6, 2);//Legs
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 5, 0, 0, 2);//Hands
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 6, 78, 6, 2);//shoes
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 7, 0, 0, 2);//Scarf
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 8, -1, 0, 2);//AccTop
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 9, 0, 0, 2);//Armor
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 10, 0, 0, 2);//Emb--not used
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 11, 287, 6, 2);//Top2
-                    }
-                    else
-                    {
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 1, 134, 8, 2);//mask
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 2, 0, 0, 2);//hair
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 3, 3, 0, 2);//Torso
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 4, 106, 8, 2);//Legs
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 5, 0, 0, 2);//Hands
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 6, 83, 8, 2);//shoes
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 7, 0, 0, 2);//Scarf
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 8, -1, 0, 2);//AccTop
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 9, 0, 0, 2);//Armor
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 10, 0, 0, 2);//Emb--not used
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 11, 274, 8, 2);//Top2
-                    }
-                }
+                Fixtures.PFHair01 = iHair;
+                Fixtures.PFHair02 = iHair2;
             }
             else
             {
-                if (FemaleCloth.Count > 0)
+                iHair = PedList[iReload].PFMySetting.PFHair01;
+                iHair2 = PedList[iReload].PFMySetting.PFHair02;
+            }
+
+            Function.Call(Hash._SET_PED_HAIR_COLOR, Pedx.Handle, iHair, iHair2);
+
+            OnlineWardrobe(Pedx, bMale, vMyCar, iSeat, Fixtures, iReload);
+        }
+        private void OnlineWardrobe(Ped Pedx, bool bMale, Vehicle vMyCar, int iSeat, PedFixtures Fixtures, int iReload)
+        {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("OnlineWardrobe", tEx);
+            if (Fixtures != null)
+            {
+                ClothBank MyWard = new ClothBank();
+                Function.Call(Hash.CLEAR_ALL_PED_PROPS, Pedx);
+
+                if (bMale)
                 {
-                    ClothBank MyWard = FemaleCloth[RandInt(0, FemaleCloth.Count - 1)];
-                    OnlineSavedWard(Pedx, MyWard);
+                    if (MaleCloth.Count > 0)
+                        MyWard = MaleCloth[RandInt(0, MaleCloth.Count - 1)];
+                    else
+                    {
+                        int RanChar = RandInt(1, 6);
+                        if (RanChar == 1)
+                        {
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(12);
+                            MyWard.ClothB.Add(4);
+
+                            MyWard.ClothA.Add(1);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(1);
+                            MyWard.ClothB.Add(5);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(65);
+                            MyWard.ClothB.Add(3);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(22);
+                            MyWard.ClothB.Add(4);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(11);
+                            MyWard.ClothB.Add(11);
+
+                            MyWard.ExtraA.Add(0);
+                            MyWard.ExtraB.Add(0);
+                        }
+                        else if (RanChar == 2)
+                        {
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(14);
+                            MyWard.ClothB.Add(3);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(17);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(23);
+                            MyWard.ClothB.Add(4);
+
+                            MyWard.ClothA.Add(40);
+                            MyWard.ClothB.Add(1);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(26);
+                            MyWard.ClothB.Add(3);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(35);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ExtraA.Add(0);
+                            MyWard.ExtraB.Add(0);
+                        }
+                        else if (RanChar == 3)
+                        {
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(147);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(167);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(33);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(36);
+                            MyWard.ClothB.Add(1);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(-1);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(286);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ExtraA.Add(0);
+                            MyWard.ExtraB.Add(0);
+                        }
+                        else if (RanChar == 4)
+                        {
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(11);
+                            MyWard.ClothB.Add(4);
+
+                            MyWard.ClothA.Add(19);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(88);
+                            MyWard.ClothB.Add(7);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(14);
+                            MyWard.ClothB.Add(2);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(-1);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(273);
+                            MyWard.ClothB.Add(15);
+
+                            MyWard.ExtraA.Add(0);
+                            MyWard.ExtraB.Add(0);
+                        }
+                        else if (RanChar == 5)
+                        {
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(125);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(-1);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(114);
+                            MyWard.ClothB.Add(6);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(78);
+                            MyWard.ClothB.Add(6);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(-1);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(287);
+                            MyWard.ClothB.Add(6);
+
+                            MyWard.ExtraA.Add(0);
+                            MyWard.ExtraB.Add(0);
+                        }
+                        else
+                        {
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(134);
+                            MyWard.ClothB.Add(8);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(3);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(106);
+                            MyWard.ClothB.Add(8);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(83);
+                            MyWard.ClothB.Add(8);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(-1);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(274);
+                            MyWard.ClothB.Add(8);
+
+                            MyWard.ExtraA.Add(0);
+                            MyWard.ExtraB.Add(0);
+                        }
+                    }
                 }
                 else
                 {
-                    int RanChar = RandInt(1, 5);
-                    if (RanChar == 1)
-                    {
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 1, 146, 0, 2);//mask
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 2, 0, 0, 2);//hair
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 3, -1, 1, 2);//Torso
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 4, 113, 1, 2);//Legs
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 5, 0, 0, 2);//Hands
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 6, 23, 8, 2);//shoes
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 7, 0, 0, 2);//Scarf
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 8, 0, 0, 2);//AccTop
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 9, 0, 0, 2);//Armor
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 10, 0, 0, 2);//Emb--not used
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 11, 287, 1, 2);//Top2
-                    }
-                    else if (RanChar == 2)
-                    {
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 1, 0, 0, 2);//mask
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 2, 11, 3, 2);//hair
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 3, 169, 12, 2);//Torso
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 4, 93, 4, 2);//Legs
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 5, 0, 0, 2);//Hands
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 6, 3, 0, 2);//shoes
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 7, 0, 0, 2);//Scarf
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 8, -1, 0, 2);//AccTop
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 9, 0, 0, 2);//Armor
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 10, 0, 0, 2);//Emb--not used
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 11, -1, 0, 2);//Top2
-                    }
-                    else if (RanChar == 3)
-                    {
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 1, 0, 0, 2);//mask
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 2, 13, 3, 2);//hair
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 3, -1, 0, 2);//Torso
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 4, 98, 4, 2);//Legs
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 5, 0, 0, 2);//Hands
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 6, 71, 4, 2);//shoes
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 7, 1, 5, 2);//Scarf
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 8, -1, 0, 2);//AccTop
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 9, 0, 0, 2);//Armor
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 10, 0, 0, 2);//Emb--not used
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 11, 254, 4, 2);//Top2
-                    }
-                    else if (RanChar == 4)
-                    {
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 1, 0, 0, 2);//mask
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 2, 10, 1, 2);//hair
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 3, 15, 0, 2);//Torso
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 4, 9, 6, 2);//Legs
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 5, 0, 0, 2);//Hands
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 6, 54, 3, 2);//shoes
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 7, 100, 0, 2);//Scarf
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 8, 36, 1, 2);//AccTop
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 9, 0, 0, 2);//Armor
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 10, 0, 0, 2);//Emb--not used
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 11, 13, 5, 2);//Top2
-                    }
-                    else if (RanChar == 5)
-                    {
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 1, 0, 0, 2);//mask
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 2, 2, 3, 2);//hair
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 3, 11, 0, 2);//Torso
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 4, 75, 1, 2);//Legs
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 5, 0, 0, 2);//Hands
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 6, 20, 5, 2);//shoes
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 7, 0, 0, 2);//Scarf
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 8, -1, 0, 2);//AccTop
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 9, 0, 0, 2);//Armor
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 10, 0, 0, 2);//Emb--not used
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 11, 208, 4, 2);//Top2
-                    }
+                    if (FemaleCloth.Count > 0)
+                        MyWard = FemaleCloth[RandInt(0, FemaleCloth.Count - 1)];
                     else
                     {
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 1, 134, 8, 2);//mask
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 2, 0, 0, 2);//hair
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 3, 13, 0, 2);//Torso
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 4, 113, 8, 2);//Legs
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 5, 0, 0, 2);//Hands
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 6, 87, 8, 2);//shoes
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 7, -1, 0, 2);//Scarf
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 8, -1, 0, 2);//AccTop
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 9, 0, 0, 2);//Armor
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 10, 0, 0, 2);//Emb--not used
-                        Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 11, 287, 8, 2);//Top2
+                        int RanChar = RandInt(1, 5);
+                        if (RanChar == 1)
+                        {
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(146);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(-1);
+                            MyWard.ClothB.Add(1);
+
+                            MyWard.ClothA.Add(113);
+                            MyWard.ClothB.Add(1);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(23);
+                            MyWard.ClothB.Add(8);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(287);
+                            MyWard.ClothB.Add(1);
+
+                            MyWard.ExtraA.Add(0);
+                            MyWard.ExtraB.Add(0);
+                        }
+                        else if (RanChar == 2)
+                        {
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(11);
+                            MyWard.ClothB.Add(3);
+
+                            MyWard.ClothA.Add(169);
+                            MyWard.ClothB.Add(12);
+
+                            MyWard.ClothA.Add(93);
+                            MyWard.ClothB.Add(4);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(3);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(-1);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(-1);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ExtraA.Add(0);
+                            MyWard.ExtraB.Add(0);
+                        }
+                        else if (RanChar == 3)
+                        {
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(13);
+                            MyWard.ClothB.Add(3);
+
+                            MyWard.ClothA.Add(-1);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(98);
+                            MyWard.ClothB.Add(4);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(71);
+                            MyWard.ClothB.Add(4);
+
+                            MyWard.ClothA.Add(1);
+                            MyWard.ClothB.Add(5);
+
+                            MyWard.ClothA.Add(-1);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(254);
+                            MyWard.ClothB.Add(4);
+
+                            MyWard.ExtraA.Add(0);
+                            MyWard.ExtraB.Add(0);
+                        }
+                        else if (RanChar == 4)
+                        {
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(10);
+                            MyWard.ClothB.Add(1);
+
+                            MyWard.ClothA.Add(15);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(9);
+                            MyWard.ClothB.Add(6);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(54);
+                            MyWard.ClothB.Add(3);
+
+                            MyWard.ClothA.Add(100);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(36);
+                            MyWard.ClothB.Add(1);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(13);
+                            MyWard.ClothB.Add(5);
+
+                            MyWard.ExtraA.Add(0);
+                            MyWard.ExtraB.Add(0);
+                        }
+                        else if (RanChar == 5)
+                        {
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(2);
+                            MyWard.ClothB.Add(3);
+
+                            MyWard.ClothA.Add(11);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(75);
+                            MyWard.ClothB.Add(1);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(20);
+                            MyWard.ClothB.Add(5);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(-1);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(208);
+                            MyWard.ClothB.Add(4);
+
+                            MyWard.ExtraA.Add(0);
+                            MyWard.ExtraB.Add(0);
+                        }
+                        else
+                        {
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(134);
+                            MyWard.ClothB.Add(8);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(13);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(113);
+                            MyWard.ClothB.Add(8);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(87);
+                            MyWard.ClothB.Add(8);
+
+                            MyWard.ClothA.Add(-1);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(-1);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(0);
+                            MyWard.ClothB.Add(0);
+
+                            MyWard.ClothA.Add(287);
+                            MyWard.ClothB.Add(8);
+
+                            MyWard.ExtraA.Add(0);
+                            MyWard.ExtraB.Add(0);
+                        }
                     }
                 }
+
+                Fixtures.PFClothA = MyWard.ClothA;
+                Fixtures.PFClothB = MyWard.ClothB;
+
+                Fixtures.PFExtraA = MyWard.ExtraA;
+                Fixtures.PFExtraB = MyWard.ExtraB;
+
+                OnlineSavedWard(Pedx, MyWard);
             }
+            else
+            {
+                ClothBank DisBank = new ClothBank();
+
+                DisBank.ClothA = PedList[iReload].PFMySetting.PFClothA;
+                DisBank.ClothB = PedList[iReload].PFMySetting.PFClothB;
+
+                DisBank.ExtraA = PedList[iReload].PFMySetting.PFExtraA;
+                DisBank.ExtraB = PedList[iReload].PFMySetting.PFExtraB;
+
+                OnlineSavedWard(Pedx, DisBank);
+            }
+
+
+            NpcBrains(Pedx, vMyCar, iSeat, Fixtures, iReload);
         }
         private void OnlineSavedWard(Ped Pedx, ClothBank MyCloths)
         {
@@ -2452,13 +3257,14 @@ namespace OnlinePlayerz
 
             bPlayerList = false;
         }
-        private void PlayScales()
+        private void PlayScales(bool bInALoop)
         {
             using (StreamWriter tEx = File.AppendText(sBeeLogs))
                 BeeLog("PlayScales", tEx);
 
             Scaleform_PLAYER_LIST();
-            TopLeftUI("Press" + ControlSybols(iClearPlayList) + "to clear the session");
+            if (bInALoop)
+                TopLeftUI("Press" + ControlSybols(iClearPlayList) + "to clear the session");
             int iStick = Game.GameTime + 8000;
             while (iStick > Game.GameTime && !ButtonDown(iClearPlayList, false))
             {
@@ -2467,11 +3273,14 @@ namespace OnlinePlayerz
             }
             CloseBaseHelpBar();
 
-            if (ButtonDown(iClearPlayList, false))
+            if (ButtonDown(iClearPlayList, false) && bInALoop)
                 LaggOut();
         }
         private void FireOrb(int MyBrian)
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("FireOrb, MyBrian == " + MyBrian, tEx);
+
             PlayerBrain Brian = PedList[MyBrian];
             List<Vector3> FacList = new List<Vector3>();
             FacList.Add(new Vector3(1871.856f, 280.2685f, 164.3017f));
@@ -2483,9 +3292,9 @@ namespace OnlinePlayerz
             FacList.Add(new Vector3(-6.777428f, 3326.627f, 41.63125f));
             FacList.Add(new Vector3(18.59906f, 2610.94f, 85.99267f));
             FacList.Add(new Vector3(1286.877f, 2846.37f, 49.39426f));
-
+            ClearPedBlips(MyBrian);
             Brian.ThisBlip = LocalBlip(FacList[RandInt(0, FacList.Count -1)], 590, Brian.sMyName);
-            Script.Wait(5000);
+            Script.Wait(7500);
             Vector3 PlayePos = Game.Player.Character.Position;
             if (World.GetGroundHeight(PlayePos) < PlayePos.Z)
             {
@@ -2496,11 +3305,14 @@ namespace OnlinePlayerz
                 OrbExp(PlayePos, PlayerF, PlayerB, PlayerR, PlayerL);
                 OrbLoad(Brian.sMyName);
                 Script.Wait(4000);
-                PedCleaning(iNpcList, "left", false);
+                PedCleaning(MyBrian, "left", false);
             }
         }
         private void OrbExp(Vector3 Pos1, Vector3 Pos2, Vector3 Pos3, Vector3 Pos4, Vector3 Pos5)
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("OrbExp, Pos1 == " + Pos1, tEx);
+
             Function.Call(Hash.ADD_EXPLOSION, Pos2.X, Pos2.Y, Pos2.Z, 49, 1.00f, true, false, 1.00f);
             Function.Call(Hash.ADD_EXPLOSION, Pos3.X, Pos3.Y, Pos3.Z, 49, 1.00f, true, false, 1.00f);
             Function.Call(Hash.ADD_EXPLOSION, Pos4.X, Pos4.Y, Pos4.Z, 49, 1.00f, true, false, 1.00f);
@@ -2947,6 +3759,9 @@ namespace OnlinePlayerz
         }
         private void WhileYouDead(string Kellar, int iKills, int iKilled, Ped Peddy)
         {
+            using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                BeeLog("WhileYouDead, string == " + Kellar, tEx);
+
             while (Game.Player.Character.GetKiller() == Peddy)
                 Script.Wait(1);
             Script.Wait(1000);
@@ -2955,226 +3770,309 @@ namespace OnlinePlayerz
         private void PlayerZerosAI(bool bInALoop)
         {
             if (ButtonDown(iGetlayList, false) && !bPlayerList)
-                PlayScales();
+                PlayScales(bInALoop);
 
             if (ThisBrian(iNpcList) != null)
             {
-                PlayerBrain Brian = PedList[iNpcList];
+                int iBe = iNpcList;
+                if (PedList[iBe].DirBlip != null)
+                    BlipDirect(PedList[iBe].DirBlip, PedList[iBe].ThisPed.Heading);
 
-                if (Brian.DirBlip != null)
-                    BlipDirect(Brian.DirBlip, Brian.ThisPed.Heading);
-
-                if (Brian.ThisVeh != null)
+                if (PedList[iBe].iTimeOn < Game.GameTime && bInALoop)
                 {
-                    if (Brian.ThisVeh.IsDead)
+                    GetOutVehicle(PedList[iBe].ThisPed, iBe);
+                    PedCleaning(iBe, "left", false);
+                }
+                else if (Game.Player.Character.GetKiller() == PedList[iBe].ThisPed && bInALoop)
+                {
+                    PedList[iBe].iKills += 1;
+                    WhileYouDead(PedList[iBe].sMyName, PedList[iBe].iKilled, PedList[iBe].iKills, PedList[iBe].ThisPed);
+                    if (iAggression < 6)
+                        PedCleaning(iBe, "left", false);
+                }
+                else if (PedList[iBe].ThisPed.IsDead)
+                {
+                    if (PedList[iBe].iDeathSequence == 0)
                     {
-                        Brian.ThisVeh.MarkAsNoLongerNeeded();
-                        Brian.ThisVeh = null;
-                    }
-                }
+                        if (PedList[iBe].ThisVeh != null)
+                        {
+                            EmptyVeh(PedList[iBe].ThisVeh);
+                            PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
+                            PedList[iBe].ThisVeh = null;
+                        }
 
-                if (Brian.iTimeOn < Game.GameTime)
-                {
-                    GetOutVehicle(Brian.ThisPed);
-                    PedCleaning(iNpcList, "left", false);
-                }
-                else if (Game.Player.Character.GetKiller() == Brian.ThisPed)
-                {
-                    Brian.iKills += 1;
-                    WhileYouDead(Brian.sMyName, Brian.iKilled, Brian.iKills, Brian.ThisPed);
-                    if (bNoSpawnKills)
-                        PedCleaning(iNpcList, "left", false);
-                }
-                else if (Brian.ThisPed.IsDead)
-                {
-                    if (Brian.iDeathSequence == 0)
-                    {
-                        if (Brian.iKilled > RandInt(13, 22))
-                            PedCleaning(iNpcList, "left", false);
+                        if (PedList[iBe].iKilled > RandInt(13, 22) || iAggression < 2)
+                        {
+                            if (bInALoop)
+                                PedCleaning(iBe, "left", false);
+                        }
                         else
                         {
-                            int iDie = WhoShotMe(Brian.ThisPed);
-                            Brian.ThisBlip.Remove();
-                            Brian.bOverFriendly = false;
-                            if (Brian.DirBlip != null)
-                            {
-                                Brian.DirBlip.Remove();
-                                Brian.DirBlip = null;
-                            }
+                            int iDie = WhoShotMe(PedList[iBe].ThisPed);
 
-                            if (Brian.ThisPed.GetKiller() == Game.Player.Character)
+                            ClearPedBlips(iBe);
+
+                            if (PedList[iBe].ThisPed.GetKiller() == Game.Player.Character)
                             {
-                                if (Brian.bBounty)
+                                if (PedList[iBe].bBounty)
                                     Game.Player.Money += 7000;
-                                Brian.bFriendly = false;
-                                Brian.iKilled += 1;
-                                UI.Notify("You  " + Brian.iKilled + " - " + Brian.iKills + " " + Brian.sMyName);
+                                PedList[iBe].bFriendly = false;
+                                PedList[iBe].bApprochPlayer = false;
+                                PedList[iBe].bFollower = false;
+                                PedList[iBe].iKilled += 1;
+                                UI.Notify("You  " + PedList[iBe].iKilled + " - " + PedList[iBe].iKills + " " + PedList[iBe].sMyName);
                             }
                             else if (iDie != -1)
-                            {
-                                UI.Notify(PedList[iDie].sMyName + " Killed " + Brian.sMyName);
-                                Brian.ThisPed.Task.FightAgainst(PedList[iDie].ThisPed);
-                                Brian.ThisPed.AlwaysKeepTask = true;
-                            }
+                                UI.Notify(PedList[iDie].sMyName + " Killed " + PedList[iBe].sMyName);
                             else
-                                UI.Notify(Brian.sMyName + "died");
+                                UI.Notify(PedList[iBe].sMyName + " died");
 
-                            Brian.bBounty = false;
-                            Brian.iDeathSequence += 1;
-                            Brian.iDeathTime = Game.GameTime + 10000;
-                            Brian.iTimeOn += 60000;
+                            PedList[iBe].bBounty = false;
+                            PedList[iBe].iDeathSequence += 1;
+                            PedList[iBe].iDeathTime = Game.GameTime + 10000;
+                            PedList[iBe].iTimeOn += 60000;
                         }
                     }
-                    else if (Brian.iDeathSequence == 1 || Brian.iDeathSequence == 3 || Brian.iDeathSequence == 5 || Brian.iDeathSequence == 7)
+                    else if (PedList[iBe].iDeathSequence == 1 || PedList[iBe].iDeathSequence == 3 || PedList[iBe].iDeathSequence == 5 || PedList[iBe].iDeathSequence == 7)
                     {
-                        if (Brian.iDeathTime < Game.GameTime)
+                        if (PedList[iBe].iDeathTime < Game.GameTime)
                         {
-                            Brian.ThisPed.Alpha = 80;
-                            Brian.iDeathSequence += 1;
-                            Brian.iDeathTime = Game.GameTime + 500;
+                            PedList[iBe].ThisPed.Alpha = 80;
+                            PedList[iBe].iDeathSequence += 1;
+                            PedList[iBe].iDeathTime = Game.GameTime + 500;
                         }
                     }
-                    else if (Brian.iDeathSequence == 2 || Brian.iDeathSequence == 4 || Brian.iDeathSequence == 6)
+                    else if (PedList[iBe].iDeathSequence == 2 || PedList[iBe].iDeathSequence == 4 || PedList[iBe].iDeathSequence == 6)
                     {
-                        if (Brian.iDeathTime < Game.GameTime)
+                        if (PedList[iBe].iDeathTime < Game.GameTime)
                         {
-                            Brian.ThisPed.Alpha = 255;
-                            Brian.iDeathSequence += 1;
-                            Brian.iDeathTime = Game.GameTime + 500;
+                            PedList[iBe].ThisPed.Alpha = 255;
+                            PedList[iBe].iDeathSequence += 1;
+                            PedList[iBe].iDeathTime = Game.GameTime + 500;
                         }
                     }
-                    else if (Brian.iDeathSequence == 8)
+                    else if (PedList[iBe].iDeathSequence == 8)
                     {
                         if (bInALoop)
                         {
-                            if (Brian.iDeathTime < Game.GameTime)
+                            if (PedList[iBe].iDeathTime < Game.GameTime)
                             {
-                                if (Brian.iKilled > 15 && Brian.iKills == 0 && iAggression > 7)
-                                    FireOrb(iNpcList);
+                                if (PedList[iBe].iKilled > 15 && PedList[iBe].iKills == 0 && iAggression > 7)
+                                    FireOrb(iBe);
                                 else
                                 {
-                                    Vector3 Posy = FindAPed(Game.Player.Character.Position, 95.00f, 0, false, false);
-                                    Brian.ThisPed.Position = Posy;
-                                    Brian.ThisPed.Alpha = 255;
-                                    Brian.iDeathSequence = 0;
-                                    Brian.DirBlip = DirectionalBlimp(Brian.ThisPed);
-                                    Brian.ThisBlip = PedBlimp(Brian.ThisPed, 1, Brian.sMyName, Brian.bFriendly);
-                                    Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, Brian.ThisPed.Handle);
-                                    Function.Call(Hash.RESURRECT_PED, Brian.ThisPed.Handle);
-                                    Function.Call(Hash.REVIVE_INJURED_PED, Brian.ThisPed.Handle);
-                                    Brian.ThisPed.IsInvincible = false;
-                                    if (!Brian.bFriendly)
-                                        FightPlayer(Brian.ThisPed, false);
-                                    GunningIt(Brian.ThisPed);
+                                    ClearPedBlips(iBe);
+                                    PedList[iBe].iDeathSequence = 0;
+                                    PedList[iBe].ThisPed.Delete();
+                                    Vector3 Posy = FindAPed(Game.Player.Character.Position, 95.00f, true, iBe);
                                 }
                             }
                         }
                     }
                 }
-                else if (Brian.bOverFriendly)
+                else if (PedList[iBe].ThisPed.Position.Z < -90.00f)
                 {
-                    if (Brian.ThisPed.IsInVehicle())
+                    PedList[iBe].ThisPed.Kill();
+                }
+                else if (PedList[iBe].bSessionJumper)
+                {
+                    if (PedList[iBe].ThisPed.Position.DistanceTo(Game.Player.Character.Position) < 10.00f)
+                        PedCleaning(iBe, "has disappeared", true);
+                }
+                else if (PedList[iBe].bDriver)
+                {
+                    if (PedList[iBe].ThisPed.IsInVehicle())
                     {
-                        if (Game.Player.Character.Position.DistanceTo(Brian.ThisPed.Position) < 5.00f)
+                        if (PedList[iBe].bFollower)
                         {
-                            if (Brian.bHorny)
+                            if (Game.Player.Character.IsInVehicle(PedList[iBe].ThisPed.CurrentVehicle))
                             {
-                                Brian.bHorny = false;
-                                Brian.ThisVeh.SoundHorn(3000);
-                                TopLeftUI("Press" + ControlSybols(23) + "to enter vehicle");
+                                if (Game.IsWaypointActive)
+                                {
+                                    if (World.GetWaypointPosition() != LetsGoHere)
+                                    {
+                                        LetsGoHere = World.GetWaypointPosition();
+                                        DriveToooDest(PedList[iBe].ThisPed, LetsGoHere);
+                                    }
+                                }
+
                             }
-                            else if (!Game.Player.Character.IsInVehicle())
+                            else if (Game.Player.Character.IsInVehicle())
                             {
-                                if (ButtonDown(23, true))
-                                    EnterAnyVeh(Brian.ThisVeh, Game.Player.Character, 2.00f);
+                                if (PedList[iBe].ThisBlip == null)
+                                    PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 225, PedList[iBe].sMyName, PedList[iBe].bFriendly);
+
+                                if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) > 25.00f)
+                                {
+                                    if (PedList[iBe].iFindPlayer < Game.GameTime)
+                                    {
+                                        PedList[iBe].iFindPlayer = Game.GameTime + 5000;
+                                        DriveTooo(PedList[iBe].ThisPed, false);
+                                    }
+                                }
                             }
                             else
                             {
-                                Brian.bOverFriendly = false;
-                                FolllowTheLeader(Brian.ThisPed);
-                                DriveAround(Brian.ThisPed);
+                                GetOutVehicle(PedList[iBe].ThisPed, iBe);
+                                if (PedList[iBe].ThisVeh != null)
+                                {
+                                    PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
+                                    PedList[iBe].ThisVeh = null;
+                                }
+                                PedList[iBe].bPassenger = false;
+                                PedList[iBe].bDriver = false;
+                                Function.Call(Hash.TASK_FOLLOW_TO_OFFSET_OF_ENTITY, PedList[iBe].ThisPed, Game.Player.Character.Handle, 0.0f, 3.0f, 0.0f, 1.0f, -1, 0.5f, true);
                             }
                         }
-                        else if (Game.Player.Character.Position.DistanceTo(Brian.ThisPed.Position) > 45.00f)
+                        else if (PedList[iBe].bApprochPlayer)
                         {
-                            if (Brian.iFindPlayer < Game.GameTime)
+                            if (iAggression < 6 && PedList[iBe].bFriendly)
                             {
-                                Brian.iFindPlayer = Game.GameTime + 5000;
-                                DriveTooo(Brian.ThisPed, false);
+                                if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) < 5.00f)
+                                {
+                                    if (!PedList[iBe].bHorny)
+                                    {
+                                        PedList[iBe].bHorny = true;
+                                        PedList[iBe].ThisVeh.SoundHorn(3000);
+                                        TopLeftUI("Press" + ControlSybols(23) + "to enter vehicle");
+                                    }
+                                    else if (!Game.Player.Character.IsInVehicle())
+                                    {
+                                        if (ButtonDown(23, true) && bInALoop)
+                                        {
+                                            PedList[iBe].iTimeOn += 60000;
+                                            EnterAnyVeh(PedList[iBe].ThisVeh, Game.Player.Character, 2.00f, -1);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        PedList[iBe].bApprochPlayer = false;
+                                        if (Game.Player.Character.IsInVehicle(PedList[iBe].ThisVeh))
+                                        {
+                                            PedList[iBe].bFollower = true;
+                                            FolllowTheLeader(PedList[iBe].ThisPed);
+                                        }
+                                        DriveAround(PedList[iBe].ThisPed);
+                                    }
+                                }
+                                else if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) > 25.00f)
+                                {
+                                    if (PedList[iBe].iFindPlayer < Game.GameTime)
+                                    {
+                                        PedList[iBe].iFindPlayer = Game.GameTime + 5000;
+                                        DriveTooo(PedList[iBe].ThisPed, false);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) < 5.00f)
+                                {
+                                    PedList[iBe].bApprochPlayer = false;
+                                    PedList[iBe].ThisVeh.SoundHorn(3000);
+                                }
+                                else if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) > 45.00f)
+                                {
+                                    if (PedList[iBe].iFindPlayer < Game.GameTime)
+                                    {
+                                        PedList[iBe].iFindPlayer = Game.GameTime + 5000;
+                                        DriveBye(PedList[iBe].ThisPed);
+                                    }
+                                }
                             }
                         }
                     }
-                }
-                else if (Brian.bSessionJumper)
-                {
-                    if (Brian.ThisPed.Position.DistanceTo(Game.Player.Character.Position) < 10.00f)
-                        PedCleaning(iNpcList, "has disappeared", true);
-                }
-                else if (Brian.bFollower)
-                {
-                    if (Game.Player.Character.IsInVehicle())
+                    else
                     {
+                        if (PedList[iBe].ThisVeh != null)
+                        {
+                            PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
+                            PedList[iBe].ThisVeh = null;
+                        }
+                        PedList[iBe].bApprochPlayer = false;
+                        PedList[iBe].bDriver = false;
+                        ClearPedBlips(iBe);
+                        PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
+                        PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].bFriendly);
+                    }
+                }
+                else if (PedList[iBe].bPassenger)
+                {
+                    if (PedList[iBe].bFollower)
+                    {
+                        if (!Game.Player.Character.IsInVehicle())
+                        {
+                            PedList[iBe].bPassenger = false;
+                            ClearPedBlips(iBe);
+                            PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
+                            PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].bFriendly);
+                            PedList[iBe].ThisPed.Task.LeaveVehicle();
+                            Function.Call(Hash.TASK_FOLLOW_TO_OFFSET_OF_ENTITY, PedList[iBe].ThisPed, Game.Player.Character.Handle, 0.0f, 3.0f, 0.0f, 1.0f, -1, 0.5f, true);
+                        }
+                    }
+                    else
+                    {
+                        if (!PedList[iBe].ThisPed.IsInVehicle())
+                        {
+                            PedList[iBe].bPassenger = false;
+                            ClearPedBlips(iBe);
+                            PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
+                            PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].bFriendly);
+                        }
+                    }
+                }
+                else if (PedList[iBe].bFollower)
+                {
+                    if (Game.Player.Character.IsInVehicle() && bInALoop)
+                    {
+                        PedList[iBe].bPassenger = true;
                         Vehicle DisVeh = Game.Player.Character.CurrentVehicle;
-                        if (!Brian.ThisPed.IsInVehicle(DisVeh))
-                        {
-                            EnterAnyVeh(DisVeh, Brian.ThisPed, 2.00f);
-                            Script.Wait(5000);
-                        }
-                    }
-                    else
-                    {
-                        if (Brian.ThisPed.IsInVehicle())
-                        {
-                            Brian.ThisPed.Task.LeaveVehicle();
-                            Script.Wait(5000);
-                            Function.Call(Hash.TASK_FOLLOW_TO_OFFSET_OF_ENTITY, Brian.ThisPed, Game.Player.Character.Handle, 0.0f, 3.0f, 0.0f, 1.0f, -1, 0.5f, true);
-                        }
+                        EnterAnyVeh(DisVeh, PedList[iBe].ThisPed, 2.00f, iBe);
+                        ClearPedBlips(iBe);
                     }
                 }
-                else if (Brian.bFriendly)
+                else if (PedList[iBe].bFriendly)
                 {
-                    if (Brian.ThisPed.HasBeenDamagedBy(Game.Player.Character))
+                    if (PedList[iBe].ThisPed.HasBeenDamagedBy(Game.Player.Character) || PedList[iBe].ThisPed.IsInCombatAgainst(Game.Player.Character) && iAggression > 2)
                     {
-                        Brian.ThisBlip.Remove();
-                        ExMember(Brian.ThisPed);
-                        FightPlayer(Brian.ThisPed, false);
-                        Brian.bFriendly = false;
-                        Brian.bFollower = false;
-                        if (Brian.DirBlip == null)
-                            Brian.DirBlip = DirectionalBlimp(Brian.ThisPed);
-                        Brian.ThisBlip = PedBlimp(Brian.ThisPed, 1, Brian.sMyName, Brian.bFriendly);
+                        ClearPedBlips(iBe);
+                        ExMember(PedList[iBe].ThisPed);
+                        FightPlayer(PedList[iBe].ThisPed, false);
+                        PedList[iBe].bFriendly = false;
+                        PedList[iBe].bFollower = false;
+                        PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
+                        PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].bFriendly);
                     }
                     else
                     {
-                        if (Game.Player.Character.Position.DistanceTo(Brian.ThisPed.Position) < 7.00f && Brian.ThisVeh == null)
+                        if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) < 7.00f && !PedList[iBe].ThisPed.IsInVehicle())
                         {
                             if (Game.Player.Character.IsInVehicle())
                             {
                                 if (Game.Player.Character.SeatIndex == VehicleSeat.Driver)
                                 {
-                                    if (Brian.bHorny2)
+                                    if (!PedList[iBe].bHorny2)
                                     {
                                         TopLeftUI("Press" + ControlSybols(86) + "to attract the players attention");
-                                        Brian.bHorny2 = false;
+                                        PedList[iBe].bHorny2 = true;
                                     }
                                     else if (ButtonDown(86, false))
                                     {
                                         if (iAggression < 9)
                                         {
-                                            FolllowTheLeader(Brian.ThisPed);
-                                            Brian.iTimeOn += 60000;
-                                            Brian.bFollower = true;
+                                            FolllowTheLeader(PedList[iBe].ThisPed);
+                                            PedList[iBe].iTimeOn += 60000;
+                                            PedList[iBe].bFollower = true;
                                         }
                                         else
                                         {
-                                            Brian.ThisBlip.Remove();
-                                            ExMember(Brian.ThisPed);
-                                            FightPlayer(Brian.ThisPed, false);
-                                            Brian.bFriendly = false;
-                                            Brian.bFollower = false;
-                                            if (Brian.DirBlip == null)
-                                                Brian.DirBlip = DirectionalBlimp(Brian.ThisPed);
-                                            Brian.ThisBlip = PedBlimp(Brian.ThisPed, 1, Brian.sMyName, Brian.bFriendly);
+                                            ClearPedBlips(iBe);
+                                            ExMember(PedList[iBe].ThisPed);
+                                            FightPlayer(PedList[iBe].ThisPed, false);
+                                            PedList[iBe].bFriendly = false;
+                                            PedList[iBe].bFollower = false;
+                                            PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
+                                            PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].bFriendly);
                                         }
                                     }
                                 }
@@ -3184,12 +4082,13 @@ namespace OnlinePlayerz
                 }
                 else
                 {
-                    if (Brian.ThisPed.Position.DistanceTo(Game.Player.Character.Position) > 350.00f && iAggression > 4)
+                    if (PedList[iBe].ThisPed.Position.DistanceTo(Game.Player.Character.Position) > 350.00f && iAggression > 4 && PedList[iBe].iDeathSequence == 0 && bInALoop)
                     {
-                        if (Brian.ThisVeh == null)
-                            AirAttack(iNpcList);
+                        if (PedList[iBe].ThisVeh == null)
+                            AirAttack(iBe);
                     }
                 }
+
                 iNpcList += 1;
             }
             else
