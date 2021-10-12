@@ -17,6 +17,7 @@ namespace OnlinePlayerz
         private ScriptSettings GetKeys;
         
         bool bTrainM = true;//set the test then set to false
+        bool bDebugger = false;
         bool bLoadUp = true;
         bool bPlayerList = false;
         bool bHeistPop = true;
@@ -24,14 +25,16 @@ namespace OnlinePlayerz
         bool bPiggyBack = false;
         bool bHackEvent = false;
         bool bSpaceWeaps = false;
+        bool bDisabled = false;
+        bool bSearching = true;
+        bool bStuckOnYou = false;
 
-        string Version = "1.3";
+        string Version = "1.4";
         string sBeeLogs = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/PlayerZLog.txt";
         string sMemory = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/PlayerZsMemory.xml";
         string sTheIni = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/PlayerZSettings.ini";
         string sOutfitts = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/Outfits.xml";
 
-        int iLogCount = 0;
         int iMaxPlayers = 29;
         int iNpcList = 0;
         int iBlpList = 0;
@@ -41,11 +44,14 @@ namespace OnlinePlayerz
         int iScale = 0;
         int iMinWait = 15000;
         int iMaxWait = 45000;
+        int iAccMin = 25;
+        int iAccMax = 75;
         int iMinSession = 30000;
         int iMaxSession = 475000;
         int iAggression = 5;
         int iGetlayList = 19;
         int iClearPlayList = 131;
+        int iDisableMod = 28;
 
         int iPlayerGroups = Game.Player.Character.RelationshipGroup;
         int iAttackingNPCs = World.AddRelationshipGroup("AttackNPCs");
@@ -71,8 +77,6 @@ namespace OnlinePlayerz
         List<ClothBank> MaleCloth = new List<ClothBank>();
         List<ClothBank> FemaleCloth = new List<ClothBank>();
 
-        List<int> iVehHandles = new List<int>();
-
         public Main()
         {
             Tick += OnTick;
@@ -80,8 +84,7 @@ namespace OnlinePlayerz
         }
         private void LoadSettings()
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("LoadSettings", tEx);
+            GetLogging("LoadSettings");
 
             if (File.Exists(sTheIni))
             {
@@ -93,9 +96,13 @@ namespace OnlinePlayerz
                 iMaxWait = GetKeys.GetValue<int>("Settings", "iMaxWait", 45000);
                 iMinSession = GetKeys.GetValue<int>("Settings", "iMinSession", 30000);
                 iMaxSession = GetKeys.GetValue<int>("Settings", "iMaxSession", 475000);
+                iAccMin = GetKeys.GetValue<int>("Settings", "iMinAccuracy", 25);
+                iAccMax = GetKeys.GetValue<int>("Settings", "iMaxAccuracy", 75);
                 bSpaceWeaps = GetKeys.GetValue<bool>("Settings", "SpaceWeaps", false);
                 iGetlayList = GetKeys.GetValue<int>("Settings", "iGetlayList", 19);
                 iClearPlayList = GetKeys.GetValue<int>("Settings", "iClearPlayList", 131);
+                iDisableMod = GetKeys.GetValue<int>("Settings", "iDisableMod", 28);
+                bDebugger = GetKeys.GetValue<bool>("Settings", "bDebugger", false);
             }
 
             if (iAggression > 11)
@@ -111,36 +118,39 @@ namespace OnlinePlayerz
             if (iMinWait > iMaxWait)
                 iMaxWait = iMinWait + 1;
 
+            if (iAccMin > iAccMax)
+                iAccMax = iAccMin + 1;
+
+            if (iAccMax > 99)
+                iAccMax = 100;
+
+            if (iAccMin < 1)
+                iAccMax = 0;
+
             if (iMinSession > iMaxSession)
                 iMaxSession = iMinSession + 1;
         }
         private void BeeLog(string sLogs, TextWriter tEx)
         {
-            iLogCount += 1;
-            if (iLogCount > 25000)
-            {
-                iLogCount = 0;
-                File.Delete(sBeeLogs);
-                for (int i = 0; i < sDebuggler.Count; i++)
-                    tEx.WriteLine(sDebuggler[i]);
-                tEx.WriteLine($"{DateTime.Now.ToLongTimeString()} {DateTime.Now.ToLongDateString()} {"--" + sLogs}");
-                sDebuggler.Clear();
-            }
-            else if (iLogCount > 24950)
+            unsafe
             {
                 tEx.WriteLine($"{DateTime.Now.ToLongTimeString()} {DateTime.Now.ToLongDateString()} {"--" + sLogs}");
-                sDebuggler.Add($"{DateTime.Now.ToLongTimeString()} {DateTime.Now.ToLongDateString()} {"--" + sLogs}");
             }
-            else
-                tEx.WriteLine($"{DateTime.Now.ToLongTimeString()} {DateTime.Now.ToLongDateString()} {"--" + sLogs}");
+        }
+        private void GetLogging(string sMyLog)
+        {
+            if (bDebugger)
+            {
+                using (StreamWriter tEx = File.AppendText(sBeeLogs))
+                    BeeLog(sMyLog, tEx);
+            }
         }
         private void LoadUp()
         {
             if (File.Exists(sBeeLogs))
                 File.Delete(sBeeLogs);
 
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("LoadUp", tEx);
+            GetLogging("LoadUp");
 
             World.SetRelationshipBetweenGroups(Relationship.Hate, iPlayerGroups, iAttackingNPCs);
             World.SetRelationshipBetweenGroups(Relationship.Hate, iAttackingNPCs, iPlayerGroups);
@@ -164,10 +174,6 @@ namespace OnlinePlayerz
         }
         private void SetBTimer(int AddTime, int iSetPos)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("SetBTimer, AddTime == " + AddTime + ", iSetPos == " + iSetPos, tEx);
-
-
             if (iSetPos != -1)
             {
                 if (iSetPos < iTimers.Count)
@@ -177,7 +183,6 @@ namespace OnlinePlayerz
             }
             else
                 iTimers.Add(Game.GameTime + AddTime);
-
         }
         public bool BTimer(int iMyTime)
         {
@@ -192,9 +197,6 @@ namespace OnlinePlayerz
         }
         public bool BOnBOff(int iBee)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("BOnBOff, iBee == " + iBee, tEx);
-
             if (BeOnOff.Count == 0)
             {
                 for (int i = 0; i < 25; i++)
@@ -211,8 +213,7 @@ namespace OnlinePlayerz
         }
         public string SillyNameList()
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("SillyNameList ", tEx);
+            GetLogging("SillyNameList");
 
             string MySilly = "";
 
@@ -312,8 +313,7 @@ namespace OnlinePlayerz
         }
         private void InABuilding()
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("InABuilding", tEx);
+            GetLogging("InABuilding");
 
             List<int> iKeepItReal = new List<int>();
 
@@ -342,8 +342,7 @@ namespace OnlinePlayerz
         }
         private void BuildList()
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("BuildList", tEx);
+            GetLogging("BuildList");
 
             //.Name = "3 Alta St"
             AFKPlayers.Add(new Vector3(-259.8061F, -969.4397F, 30.21999F));
@@ -428,9 +427,7 @@ namespace OnlinePlayerz
         }
         private void FindMisfits()
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("FindMisfits", tEx);
-
+            GetLogging("FindMisfits");
 
             if (Directory.Exists("" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/"))
             {
@@ -487,52 +484,71 @@ namespace OnlinePlayerz
         }
         private void PedCleaning(int iPed, string sOff, bool bGone)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("PedCleaning, iPed == " + iPed, tEx);
+            GetLogging("PedCleaning, iPed == " + iPed);
 
-            UI.Notify("~h~" + PedList[iPed].sMyName + "~s~ " + sOff);
+            int iBe = ReteaveBrain(iPed);
+            UI.Notify("~h~" + PedList[iBe].sMyName + "~s~ " + sOff);
 
             DeListingBrains(true, iPed, bGone);
+            bSearching = true;
             iCurrentPlayerz -= 1;
         }
         private void DeListingBrains(bool bPed, int iPos, bool bGone)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("DeListingBrains, bPed == " + bPed + ", iPos == " + iPos, tEx);
+            GetLogging("DeListingBrains, bPed == " + bPed + ", iPos == " + iPos);
 
             if (bPed)
             {
-                if (PedList[iPos].bHacker)
+                iPos = ReteaveBrain(iPos);
+
+                if (PedList[iPos].ThisPed == null)
                 {
-                    for (int i = 0; i < Plops.Count; i++)
-                        Plops[i].MarkAsNoLongerNeeded();
+                    bSearching = false;
+                    if (PedList[iPos].ThisBlip != null)
+                        PedList[iPos].ThisBlip.Remove();
 
-                    for (int i = 0; i < Vicks.Count; i++)
-                        Vicks[i].MarkAsNoLongerNeeded();
+                    if (PedList[iPos].DirBlip != null)
+                        PedList[iPos].DirBlip.Remove();
 
-                    PedList[iPos].ThisPed.Detach();
-                    bHackerIn = false;
-                    bPiggyBack = false;
-                    FireOrb(-1, PedList[iPos].ThisPed);
+                    if (PedList[iPos].ThisVeh != null)
+                        PedList[iPos].ThisVeh.MarkAsNoLongerNeeded();
+
+                    PedList.RemoveAt(iPos);
                 }
-
-                if (PedList[iPos].bFollower)
-                    iFollow -= 1;
-                if (PedList[iPos].ThisBlip != null)
-                    PedList[iPos].ThisBlip.Remove();
-
-                if (PedList[iPos].DirBlip != null)
-                    PedList[iPos].DirBlip.Remove();
-
-                if (PedList[iPos].ThisVeh != null)
-                    PedList[iPos].ThisVeh.MarkAsNoLongerNeeded();
-
-                if (bGone)
-                    PedList[iPos].ThisPed.Delete();
                 else
-                    PedList[iPos].ThisPed.MarkAsNoLongerNeeded();
+                { 
+                    if (PedList[iPos].bHacker)
+                    {
+                        for (int i = 0; i < Plops.Count; i++)
+                            Plops[i].MarkAsNoLongerNeeded();
 
-                PedList.RemoveAt(iPos);
+                        for (int i = 0; i < Vicks.Count; i++)
+                            Vicks[i].MarkAsNoLongerNeeded();
+
+                        PedList[iPos].ThisPed.Detach();
+                        bHackerIn = false;
+                        bPiggyBack = false;
+                        FireOrb(-1, PedList[iPos].ThisPed);
+                    }
+
+                    if (PedList[iPos].bFollower)
+                        iFollow -= 1;
+                    if (PedList[iPos].ThisBlip != null)
+                        PedList[iPos].ThisBlip.Remove();
+
+                    if (PedList[iPos].DirBlip != null)
+                        PedList[iPos].DirBlip.Remove();
+
+                    if (PedList[iPos].ThisVeh != null)
+                        PedList[iPos].ThisVeh.MarkAsNoLongerNeeded();
+
+                    if (bGone)
+                        PedList[iPos].ThisPed.Delete();
+                    else
+                        PedList[iPos].ThisPed.MarkAsNoLongerNeeded();
+
+                    PedList.RemoveAt(iPos);
+                }
             }
             else
             {
@@ -545,9 +561,6 @@ namespace OnlinePlayerz
         }
         public int LessRandomz(int iMin, int iMax, int iList)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("LessRandomz, iList == " + iList, tEx);
-
             while (iRandList.Count() < iList + 1)
             {
                 ImNotRandom iBe = new ImNotRandom();
@@ -586,16 +599,15 @@ namespace OnlinePlayerz
         }
         private void NewPlayer()
         {
+            GetLogging("NewPlayer, iCurrentPlayerz == " + iCurrentPlayerz);
             SetBTimer(RandInt(iMinWait, iMaxWait), 1);
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("NewPlayer, iCurrentPlayerz == " + iCurrentPlayerz, tEx);
-
             LoadSettings();
 
             if (iCurrentPlayerz < iMaxPlayers)
             {
                 if (BOnBOff(0))
                 {
+                    bStuckOnYou = true;
                     if (BOnBOff(3))
                         FindAPed(Game.Player.Character.Position, 95.00f, true, -1);
                     else
@@ -627,8 +639,7 @@ namespace OnlinePlayerz
         }
         public bool BeInAngle(float fRange, float fValue_01, float fValue_02)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("BeInAngle, fRange == " + fRange + ", fValue_01 == " + fValue_01 + ", fValue_02 == " + fValue_02, tEx);
+            GetLogging("BeInAngle, fRange == " + fRange + ", fValue_01 == " + fValue_01 + ", fValue_02 == " + fValue_02);
 
             bool bInRange = false;
 
@@ -657,9 +668,6 @@ namespace OnlinePlayerz
         }
         public Vehicle LookNear(Vector3 Vec3)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("LookNear", tEx);
-
             Vehicle Vickary = null;
 
             if (World.GetNextPositionOnStreet(Game.Player.Character.Position).DistanceTo(Game.Player.Character.Position) < 95.00f)
@@ -683,29 +691,32 @@ namespace OnlinePlayerz
         }
         public Vehicle FindNearestVeh(Vector3 Vec3, string sModel, bool bAddPlayer)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("FindNearestVeh, sModel == " + sModel, tEx);
+            GetLogging("FindNearestVeh, sModel == " + sModel);
 
             Vehicle VickPos = LookNear(Vec3);
 
-            while (VickPos == null)
+            while (VickPos == null && bSearching)
             {
-                PlayerZerosAI(false);
+                PlayerZerosAI();
 
                 Script.Wait(100);
                 VickPos = LookNear(Game.Player.Character.Position);
             }
-            Vector3 PedPos = VickPos.Position;
-            float PedRot = VickPos.Heading;
-            VickPos.Delete();
+            bStuckOnYou = false;
+            if (bSearching)
+            {
+                Vector3 PedPos = VickPos.Position;
+                float PedRot = VickPos.Heading;
+                VickPos.Delete();
+                VickPos = VehicleSpawn(sModel, PedPos, PedRot, bAddPlayer, true);
+            }
+            else
+                VickPos = null;
 
-            return VehicleSpawn(sModel, PedPos, PedRot, bAddPlayer, true);
+            return VickPos;
         }
         public bool VehExists(Vehicle[] Vehlist, int iPos)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("VehExists, iPos == " + iPos, tEx);
-
             bool bExist = false;
 
             if (iPos < Vehlist.Count())
@@ -720,8 +731,7 @@ namespace OnlinePlayerz
         }
         public bool IsItARealVehicle(string sVehName)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("IsItARealVehicle, sVehName == " + sVehName, tEx);
+            GetLogging("IsItARealVehicle, sVehName == " + sVehName);
 
             bool bIsReal = false;
 
@@ -733,8 +743,7 @@ namespace OnlinePlayerz
         }
         public string RandVeh(int iVechList)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("RandVeh, iVechList == " + iVechList, tEx);
+            GetLogging("RandVeh, iVechList == " + iVechList);
 
             List<string> sVehicles = new List<string>();
 
@@ -1206,8 +1215,7 @@ namespace OnlinePlayerz
         }
         public Vehicle VehicleSpawn(string sVehModel, Vector3 VecLocal, float VecHead, bool bAddPlayer, bool bRandomFeat)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("VehicleSpawn, sVehModel == " + sVehModel + ", bAddPlayer == " + bAddPlayer, tEx);
+            GetLogging("VehicleSpawn, sVehModel == " + sVehModel + ", bAddPlayer == " + bAddPlayer);
 
             Vehicle BuildVehicle = null;
 
@@ -1246,30 +1254,30 @@ namespace OnlinePlayerz
         }
         public Vector3 FindAPed(Vector3 vZone, float fRadius, bool bReplace, int iReload)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("FindAPed", tEx);
+            GetLogging("FindAPed, iReload == " + iReload);
 
             Ped VPedPos = DoStopTillDrop(vZone, fRadius);
-
-            while (VPedPos == null)
+            Vector3 PedPos = Vector3.Zero;
+            while (VPedPos == null && bSearching)
             {
-                PlayerZerosAI(false);
+                PlayerZerosAI();
                 Script.Wait(100);
                 VPedPos = DoStopTillDrop(Game.Player.Character.Position, 150.00f);
             }
-            Vector3 PedPos = VPedPos.Position;
-            float PedRot = VPedPos.Heading;
-            VPedPos.Delete();
-            if (bReplace)
-                GenPlayerPed(PedPos, PedRot, null, 0, iReload);
+            bStuckOnYou = false;
+            if (bSearching)
+            {
+                PedPos = VPedPos.Position;
+                float PedRot = VPedPos.Heading;
+                VPedPos.Delete();
+                if (bReplace)
+                    GenPlayerPed(PedPos, PedRot, null, 0, iReload);
+            }
 
             return PedPos;
         }
         public Ped DoStopTillDrop(Vector3 vZone, float fRadius)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("DoStopTillDrop", tEx);
-
             Ped RandPed = null;
             Ped[] MadPeds = World.GetNearbyPeds(vZone, fRadius);
 
@@ -1288,9 +1296,6 @@ namespace OnlinePlayerz
         }
         public bool PedExists(Ped[] Peddylist, int iPos)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("PedExists, iPos == " + iPos, tEx);
-
             bool bExist = false;
 
             if (iPos < Peddylist.Count())
@@ -1306,8 +1311,7 @@ namespace OnlinePlayerz
         }
         public Ped GenPlayerPed(Vector3 vLocal, float fAce, Vehicle vMyCar, int iSeat, int iReload)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("GenPlayerPed, iSeat == " + iSeat + ", iReload == " + iReload, tEx);
+            GetLogging("GenPlayerPed, iSeat == " + iSeat + ", iReload == " + iReload);
 
             Ped MyPed = null;
             bool bMale = false;
@@ -1321,11 +1325,16 @@ namespace OnlinePlayerz
                     sPeddy = "mp_m_freemode_01";
                 }
             }
-            else if (PedList[iReload].PFMySetting.PFMale)
+            else
             {
-                bMale = true;
-                sPeddy = "mp_m_freemode_01";
+                iReload = ReteaveBrain(iReload);
+                if (PedList[iReload].PFMySetting.PFMale)
+                {
+                    bMale = true;
+                    sPeddy = "mp_m_freemode_01";
+                }
             }
+
 
             var model = new Model(sPeddy);
             model.Request();    // Check if the model is valid
@@ -1339,7 +1348,8 @@ namespace OnlinePlayerz
 
                 if (MyPed.Exists())
                 {
-                    MyPed.Accuracy = RandInt(25, 75);
+                    int iAccuracy = RandInt(iAccMin, iAccMax);
+                    Function.Call(Hash.SET_PED_ACCURACY, MyPed, iAccuracy);
                     MyPed.MaxHealth = RandInt(200, 400);
                     MyPed.Health = MyPed.MaxHealth;
 
@@ -1351,7 +1361,7 @@ namespace OnlinePlayerz
                         OnlineFaceTypes(MyPed, bMale, vMyCar, iSeat, MyFixtures, iReload);
                     }
                     else
-                        OnlineFaceTypes(MyPed, bMale, vMyCar, iSeat, null, iReload);
+                        OnlineFaceTypes(MyPed, bMale, vMyCar, iSeat, null, PedList[iReload].iLevel);
                 }
                 else
                     MyPed = null;
@@ -1363,15 +1373,13 @@ namespace OnlinePlayerz
         }
         private void WarptoAnyVeh(Vehicle Vhic, Ped Peddy, int iSeat)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("WarptoAnyVeh, iSeat == " + iSeat, tEx);
+            GetLogging("WarptoAnyVeh, iSeat == " + iSeat);
 
             Function.Call(Hash.SET_PED_INTO_VEHICLE, Peddy, Vhic, iSeat);
         }
         private void EnterAnyVeh(Vehicle Vhic, Ped Peddy, float Run, int iBPed)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("EnterAnyVeh, Run == " + Run, tEx);
+            GetLogging("EnterAnyVeh, iBPed == " + iBPed);
 
             bool bFound = false;
             Peddy.BlockPermanentEvents = true;
@@ -1392,11 +1400,9 @@ namespace OnlinePlayerz
                 {
                     if (Peddy.Position.DistanceTo(Vhic.Position) < 65.00f)
                     {
-                        while (!Peddy.IsInVehicle(Vhic) && !Peddy.IsDead && !Peddy.IsFalling)
+                        while (!Peddy.IsInVehicle(Vhic) && !Peddy.IsDead && !Peddy.IsFalling && bSearching)
                         {
-                            PlayerZerosAI(false);
-
-                            if (Peddy.Position.DistanceTo(Vhic.Position) > 65.00f)
+                            if (Peddy.Position.DistanceTo(Vhic.Position) > 65.00f || Game.Player.Character.Position.DistanceTo(Peddy.Position) > 65.00f)
                                 WarptoAnyVeh(Vhic, Peddy, iSeats);
                             else if (!Function.Call<bool>(Hash.IS_PED_GETTING_INTO_A_VEHICLE, Peddy))
                                 Function.Call(Hash.TASK_ENTER_VEHICLE, Peddy, Vhic, -1, iSeats, Run, 1, 0);
@@ -1411,45 +1417,51 @@ namespace OnlinePlayerz
                 {
                     if (iBPed != -1)
                     {
+                        iBPed = ReteaveBrain(iBPed);
                         if (PedList[iBPed].ThisVeh != null)
                             PedList[iBPed].ThisVeh.MarkAsNoLongerNeeded();
 
-                        PedList[iBPed].ThisVeh = FindNearestVeh(Game.Player.Character.Position, RandVeh(RandInt(1, 9)), false);
-                        while (!Peddy.IsInVehicle() && !Peddy.IsDead && !Peddy.IsFalling && PedList[iBPed].ThisVeh != null && Game.Player.Character.IsInVehicle())
+                        if (!bStuckOnYou)
                         {
-                            PlayerZerosAI(false);
+                            PedList[iBPed].ThisVeh = FindNearestVeh(Game.Player.Character.Position, RandVeh(RandInt(1, 9)), false);
+                            while (!Peddy.IsInVehicle() && !Peddy.IsDead && !Peddy.IsFalling && PedList[iBPed].ThisVeh != null && Game.Player.Character.IsInVehicle() && bSearching)
+                            {
+                                if (Peddy.Position.DistanceTo(Vhic.Position) > 65.00f || Game.Player.Character.Position.DistanceTo(Peddy.Position) > 65.00f)
+                                    WarptoAnyVeh(PedList[iBPed].ThisVeh, Peddy, -1);
+                                else if (!Function.Call<bool>(Hash.IS_PED_GETTING_INTO_A_VEHICLE, Peddy))
+                                    Function.Call(Hash.TASK_ENTER_VEHICLE, Peddy, PedList[iBPed].ThisVeh, -1, -1, Run, 1, 0);
 
-                            if (Peddy.Position.DistanceTo(Vhic.Position) > 65.00f)
-                                WarptoAnyVeh(PedList[iBPed].ThisVeh, Peddy, -1);
-                            else if (!Function.Call<bool>(Hash.IS_PED_GETTING_INTO_A_VEHICLE, Peddy))
-                                Function.Call(Hash.TASK_ENTER_VEHICLE, Peddy, PedList[iBPed].ThisVeh, -1, -1, Run, 1, 0);
-
-                            Script.Wait(100);
+                                Script.Wait(100);
+                            }
+                            if (bSearching)
+                                PedList[iBPed].bDriver = true;
                         }
-                        PedList[iBPed].bDriver = true;
                     }
                 }
             }
-            Peddy.BlockPermanentEvents = false;
+            if (bSearching)
+                Peddy.BlockPermanentEvents = false;
         }
         private void GetOutVehicle(Ped Peddy, int iPed)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("GetOutVehicle", tEx);
+            GetLogging("GetOutVehicle");
 
             if (Peddy.IsInVehicle())
             {
                 Vehicle PedVeh = Peddy.CurrentVehicle;
                 Function.Call(Hash.TASK_LEAVE_VEHICLE, Peddy, PedVeh, 4160);
             }
-            ClearPedBlips(iPed);
-            PedList[iPed].DirBlip = DirectionalBlimp(PedList[iPed].ThisPed);
-            PedList[iPed].ThisBlip = PedBlimp(PedList[iPed].ThisPed, 1, PedList[iPed].sMyName, PedList[iPed].iColours);
+            if (iPed != -1)
+            {
+                iPed = ReteaveBrain(iPed);
+                ClearPedBlips(PedList[iPed].iLevel);
+                PedList[iPed].DirBlip = DirectionalBlimp(PedList[iPed].ThisPed);
+                PedList[iPed].ThisBlip = PedBlimp(PedList[iPed].ThisPed, 1, PedList[iPed].sMyName, PedList[iPed].iColours);
+            }
         }
         private void EmptyVeh(Vehicle Vhic)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("EmptyVeh", tEx);
+            GetLogging("EmptyVeh");
 
             if (Vhic.Exists())
             {
@@ -1464,8 +1476,7 @@ namespace OnlinePlayerz
         }
         private void FolllowTheLeader(Ped Peddy)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("FolllowTheLeader", tEx);
+            GetLogging("FolllowTheLeader");
 
             Peddy.RelationshipGroup = Game.Player.Character.RelationshipGroup;
             Function.Call(Hash.SET_PED_AS_GROUP_MEMBER, Peddy.Handle, iPlayerGroups);
@@ -1478,16 +1489,14 @@ namespace OnlinePlayerz
         }
         private void ExMember(Ped Peddy)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("ExMember", tEx);
+            GetLogging("ExMember");
 
             if (Function.Call<bool>(Hash.IS_PED_GROUP_MEMBER, Peddy.Handle, iPlayerGroups))
                 Function.Call(Hash.REMOVE_PED_FROM_GROUP, Peddy.Handle);
         }
         private void DriveBye(Ped Peddy)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("DriveBye", tEx);
+            GetLogging("DriveBye");
 
             if (Peddy.IsInVehicle())
             {
@@ -1507,8 +1516,7 @@ namespace OnlinePlayerz
         }
         private void DriveAround(Ped Peddy)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("DriveAround", tEx);
+            GetLogging("DriveAround");
 
             if (Peddy.IsInVehicle())
             {
@@ -1524,8 +1532,7 @@ namespace OnlinePlayerz
         }
         private void DriveTooo(Ped Peddy, bool bRunOver)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("DriveTooo, bRunOver == "+ bRunOver, tEx);
+            GetLogging("DriveTooo, bRunOver == " + bRunOver);
 
             if (Peddy.IsInVehicle())
             {
@@ -1544,8 +1551,7 @@ namespace OnlinePlayerz
         }
         private void DriveToooDest(Ped Peddy, Vector3 Vme)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("DriveToooDest, Vme == " + Vme, tEx);
+            GetLogging("DriveToooDest, Vme == " + Vme);
 
             if (Peddy.IsInVehicle())
             {
@@ -1559,8 +1565,7 @@ namespace OnlinePlayerz
         }
         private void FightPlayer(Ped Peddy, bool bInVeh)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("FightPlayer ", tEx);
+            GetLogging("FightPlayer");
 
             Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, Peddy.Handle);
             Peddy.IsEnemy = true;
@@ -1575,8 +1580,9 @@ namespace OnlinePlayerz
         }
         private void AirAttack(int iPed)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("AirAttack, iPed == " + iPed, tEx);
+            GetLogging("AirAttack, iPed == " + iPed);
+
+            iPed = ReteaveBrain(iPed);
 
             Ped Peddy = PedList[iPed].ThisPed;
             if (RandInt(0, 50) < 25)
@@ -1586,10 +1592,9 @@ namespace OnlinePlayerz
         }
         private void HeliFighter(Ped Peddy,int iPed)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("HeliFighter, iPed == " + iPed, tEx);
+            GetLogging("HeliFighter, iPed == " + iPed);
 
-            ClearPedBlips(iPed);
+            ClearPedBlips(PedList[iPed].iLevel);
             string sVeh = RandVeh(13);
             Vehicle vHeli = VehicleSpawn(sVeh, new Vector3(Peddy.Position.X, Peddy.Position.Y, Peddy.Position.Z + 250.00f), 0.00f, false, false);
             WarptoAnyVeh(vHeli, Peddy, -1);
@@ -1602,10 +1607,9 @@ namespace OnlinePlayerz
         }
         private void LaserFighter(Ped Peddy, int iPed)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("LaserFighter, iPed == " + iPed, tEx);
+            GetLogging("LaserFighter, iPed == " + iPed);
 
-            ClearPedBlips(iPed);
+            ClearPedBlips(PedList[iPed].iLevel);
             string sVeh = RandVeh(12);
             Vehicle vPlane = VehicleSpawn(sVeh, new Vector3(Peddy.Position.X, Peddy.Position.Y, Peddy.Position.Z + 1550.00f), 0.00f, false, false);
             WarptoAnyVeh(vPlane, Peddy, -1);
@@ -1618,8 +1622,7 @@ namespace OnlinePlayerz
         }
         private void FlyAway(Ped Pedd, Vector3 vHeliDest, float fSpeed, float flanding)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("FlyAway", tEx);
+            GetLogging("FlyAway");
 
             Vehicle vHeli = Pedd.CurrentVehicle;
             vHeli.FreezePosition = false;
@@ -1639,8 +1642,7 @@ namespace OnlinePlayerz
         }
         private void HackerTime(Ped Peddy)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("HackerTime ", tEx);
+            GetLogging("HackerTime");
 
             if (Game.Player.Character.Position.DistanceTo(new Vector3(-778.81F, 312.66F, 84.70F)) < 80.00f)
             {
@@ -1674,8 +1676,7 @@ namespace OnlinePlayerz
         }
         private void RoBoCar(Vehicle Atchoo)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("RoBoCar ", tEx);
+            GetLogging("RoBoCar");
 
             Atchoo.IsVisible = false;
 
@@ -1891,8 +1892,7 @@ namespace OnlinePlayerz
         }
         private void ForceAnim(Ped peddy, string sAnimDict, string sAnimName, Vector3 AnPos, Vector3 AnRot)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("ForceAnim, sAnimName == " + sAnimName, tEx);
+            GetLogging("ForceAnim, sAnimName == " + sAnimName);
 
             peddy.Task.ClearAll();
             Function.Call(Hash.REQUEST_ANIM_DICT, sAnimDict);
@@ -1903,8 +1903,9 @@ namespace OnlinePlayerz
         }
         private void ClearPedBlips(int iPed)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("ClearPedBlips, iPed == " + iPed, tEx);
+            GetLogging("ClearPedBlips, iPed == " + iPed);
+
+            iPed = ReteaveBrain(iPed);
 
             PlayerBrain PeBrain = PedList[iPed];
             if (PeBrain.ThisBlip != null)
@@ -1920,8 +1921,7 @@ namespace OnlinePlayerz
         }
         public int NearHiest(bool bLaunch)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("NearHiest, bLaunch == " + bLaunch, tEx);
+            GetLogging("NearHiest, bLaunch == " + bLaunch);
 
             int iNear = -1;
             List<Vector3> VectorList = new List<Vector3>();
@@ -1947,8 +1947,7 @@ namespace OnlinePlayerz
         }
         private void HeistDrips(int iMyArea)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("HeistDrips, iMyArea == " + iMyArea, tEx);
+            GetLogging("HeistDrips, iMyArea == " + iMyArea);
 
             List<Vector3> VectorList = new List<Vector3>();
 
@@ -1997,14 +1996,12 @@ namespace OnlinePlayerz
         }
         private void CeoBikersGreaf()
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("CeoBikersGreaf", tEx);
+            GetLogging("CeoBikersGreaf");
 
         }
         public Blip DirectionalBlimp(Ped pEdd)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("PedBlimp ", tEx);
+            GetLogging("DirectionalBlimp");
 
             Blip MyBlip = Function.Call<Blip>(Hash.ADD_BLIP_FOR_ENTITY, pEdd.Handle);
             Function.Call(Hash.SET_BLIP_SPRITE, MyBlip.Handle, 399);
@@ -2017,8 +2014,7 @@ namespace OnlinePlayerz
         }
         public Blip PedBlimp(Ped pEdd, int iBlippy, string sName, int iColour)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("PedBlimp ", tEx);
+            GetLogging("PedBlimp, iBlippy == " + iBlippy + ", sName == " + sName + ", iColour" + iColour);
 
             Blip MyBlip = Function.Call<Blip>(Hash.ADD_BLIP_FOR_ENTITY, pEdd.Handle);
             Function.Call(Hash.SET_BLIP_SPRITE, MyBlip.Handle, iBlippy);
@@ -2037,8 +2033,7 @@ namespace OnlinePlayerz
         }
         public Blip LocalBlip(Vector3 Vlocal, int iBlippy, string sName)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("LocalBlip, iBlippy == " + iBlippy, tEx);
+            GetLogging("LocalBlip, iBlippy == " + iBlippy + ", sName == " + sName);
 
             Blip MyBlip = Function.Call<Blip>(Hash.ADD_BLIP_FOR_COORD, Vlocal.X, Vlocal.Y, Vlocal.Z);
             Function.Call(Hash.SET_BLIP_SPRITE, MyBlip.Handle, iBlippy);
@@ -2061,8 +2056,7 @@ namespace OnlinePlayerz
         }
         private void GunningIt(Ped Peddy)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("GunningIt", tEx);
+            GetLogging("GunningIt");
 
             List<string> sWeapList = new List<string>();
 
@@ -2150,16 +2144,60 @@ namespace OnlinePlayerz
             for (int i = 0; i < sWeapList.Count; i++)
                 Function.Call(Hash.GIVE_WEAPON_TO_PED, Peddy, Function.Call<int>(Hash.GET_HASH_KEY, sWeapList[i]), 9999, false, true);
         }
+        public int UniqueLevels()
+        {
+            GetLogging("UniqueLevels");
+
+            int iNumber = LessRandomz(1, 1000, 11);
+
+            while (BrainNumberCheck(iNumber))
+            {
+                iNumber = LessRandomz(1, 400, 11);
+            }
+            return iNumber;
+        }
+        public bool BrainNumberCheck(int iNumber)
+        {
+            GetLogging("BrainNumberCheck, iNumber == " + iNumber);
+
+            bool bRunAgain = false;
+            for (int i = 0; i < PedList.Count; i++)
+            {
+                if (PedList[i].iLevel == iNumber)
+                {
+                    bRunAgain = true;
+                    break;
+                }
+            }
+            return bRunAgain;
+        }
+        public int ReteaveBrain(int iNumber)
+        {
+            GetLogging("ReteaveBrain, iNumber == " + iNumber);
+
+            int iAm = -1;
+            for (int i = 0; i < PedList.Count; i++)
+            {
+                if (PedList[i].iLevel == iNumber)
+                {
+                    iAm = i;
+                    break;
+                }
+            }
+
+            return iAm;
+        }
         private void NpcBrains(Ped Peddy, Vehicle VeHic, int iSeat, PedFixtures Fixtures, int iReload)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("NpcBrains, iSeat == " + iSeat + ", iReload == " + iReload, tEx);
+            GetLogging("NpcBrains, iSeat == " + iSeat + ", iReload == " + iReload);
 
-            if (Fixtures == null)
+            if (iReload != -1)
             {
+                iReload = ReteaveBrain(iReload);
                 PedList[iReload].ThisPed = Peddy;
                 PedList[iReload].DirBlip = DirectionalBlimp(Peddy);
                 PedList[iReload].ThisBlip = PedBlimp(Peddy, 1, PedList[iReload].sMyName, PedList[iReload].iColours);
+                PedList[iReload].iDeathSequence = 0;
 
                 Function.Call(Hash.SET_PED_CAN_SWITCH_WEAPON, Peddy.Handle, true);
                 Function.Call(Hash.SET_PED_COMBAT_MOVEMENT, Peddy.Handle, 2);
@@ -2172,7 +2210,11 @@ namespace OnlinePlayerz
                 Peddy.CanBeTargetted = true;
 
                 if (!PedList[iReload].bFriendly)
+                {
+                    if (PedList[iReload].iOffRadar == 0 && RandInt(0, 40) < 10)
+                        PedList[iReload].iOffRadar = -1;
                     FightPlayer(Peddy, false);
+                }
                 else
                 {
                     if (PedList[iReload].bFollower)
@@ -2192,11 +2234,13 @@ namespace OnlinePlayerz
                 MyBrains.iDeathTime = 0;
                 MyBrains.iTimeOn = Game.GameTime + RandInt(iMinSession, iMaxSession);
                 MyBrains.sMyName = SillyNameList();
-                MyBrains.iLevel = LessRandomz(1, 400, 11);
+                MyBrains.iLevel = UniqueLevels();
                 MyBrains.iKilled = 0;
                 MyBrains.iKills = 0;
                 MyBrains.iFindPlayer = 0;
                 MyBrains.iColours = 0;
+                MyBrains.iOffRadar = 0;
+                MyBrains.bOffRadar = false;
                 MyBrains.bFriendly = true;
                 MyBrains.bHacker = false;
                 MyBrains.bInCombat = false;
@@ -2379,6 +2423,8 @@ namespace OnlinePlayerz
             public int iLevel { get; set; }
             public int iKills { get; set; }
             public int iKilled { get; set; }
+            public int iOffRadar { get; set; }
+            public bool bOffRadar { get; set; }
             public bool bBounty { get; set; }
             public bool bHacker { get; set; }
             public bool bInCombat { get; set; }
@@ -2455,8 +2501,8 @@ namespace OnlinePlayerz
         }
         private void BackItUpBrain()
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("BackItUpBrain", tEx);
+            Script.Wait(100);
+            GetLogging("BackItUpBrain");
 
             BlowenMyBrains.BigBrain.Clear();
             BlowenMyBrains.BigVeh.Clear();
@@ -2466,7 +2512,8 @@ namespace OnlinePlayerz
 
             for (int i = 0; i < PedList.Count; i++)
             {
-                BlowenMyBrains.BigBrain.Add(PedList[i].ThisPed.Handle);
+                if (PedList[i].ThisPed != null)
+                    BlowenMyBrains.BigBrain.Add(PedList[i].ThisPed.Handle);
 
                 if (PedList[i].ThisVeh != null)
                     BlowenMyBrains.BigVeh.Add(PedList[i].ThisVeh.Handle);
@@ -2486,6 +2533,8 @@ namespace OnlinePlayerz
         }
         private void FindBrains()
         {
+            GetLogging("FindBrains");
+
             if (File.Exists(sMemory))
             {
                 BlowenMyBrains = LoadPlayerBrain(sMemory);
@@ -2511,8 +2560,7 @@ namespace OnlinePlayerz
         }
         private void FlushBrains(int iHandles, int iType)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("FlushBrains", tEx);
+            GetLogging("FlushBrains, iHandles == " + iHandles + ", iType == " + iType);
 
             unsafe
             {
@@ -2545,13 +2593,26 @@ namespace OnlinePlayerz
         }
         private void LaggOut()
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("LaggOut", tEx);
+            GetLogging("LaggOut");
+
+            PlayerDump();
+
+            while (!bSearching)
+            {
+                Script.Wait(RandInt(500, 2000));
+                PlayerDump();
+                if (PedList.Count == 0)
+                    bSearching = true;
+            }
+        }
+        private void PlayerDump()
+        { 
+            GetLogging("PlayerDump");
 
             for (int i = 0; i < PedList.Count; i++)
             {
-                GetOutVehicle(PedList[i].ThisPed, i);
-                PedCleaning(i, "left", false);
+                GetOutVehicle(PedList[i].ThisPed, PedList[i].iLevel);
+                PedCleaning(PedList[i].iLevel, "left", false);
             }
 
             for (int i = 0; i < AFKList.Count; i++)
@@ -2562,8 +2623,7 @@ namespace OnlinePlayerz
         }
         public int OhMyBlip(int iVehHash, int iBeLip)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("OhMyBlip, iVehHash == " + iVehHash, tEx);
+            GetLogging("OhMyBlip, iVehHash == " + iVehHash + ", iBeLip == " + iBeLip);
 
             if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "CRUSADER"))
                 iBeLip = 800;
@@ -2676,8 +2736,7 @@ namespace OnlinePlayerz
         }
         public int WhoShotMe(Ped MeDie)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("WhoShotMe", tEx);
+            GetLogging("WhoShotMe");
 
             int iShoot = -1;
 
@@ -2735,8 +2794,10 @@ namespace OnlinePlayerz
         }
         private void OnlineFaceTypes(Ped Pedx, bool bMale, Vehicle vMyCar, int iSeat, PedFixtures Fixtures, int iReload)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("OnlineFaceTypes", tEx);
+            GetLogging("OnlineFaceTypes, iSeat == " + iSeat + ", iReload == " + iReload);
+
+            if (iReload != -1)
+                iReload = ReteaveBrain(iReload);
 
             int shapeFirstID = 0;
             int shapeSecondID = 0;
@@ -2927,12 +2988,17 @@ namespace OnlinePlayerz
 
             Function.Call(Hash._SET_PED_HAIR_COLOR, Pedx.Handle, iHair, iHair2);
 
-            OnlineWardrobe(Pedx, bMale, vMyCar, iSeat, Fixtures, iReload);
+            if (iReload != -1)
+                OnlineWardrobe(Pedx, bMale, vMyCar, iSeat, Fixtures, PedList[iReload].iLevel);
+            else
+                OnlineWardrobe(Pedx, bMale, vMyCar, iSeat, Fixtures, iReload);
         }
         private void OnlineWardrobe(Ped Pedx, bool bMale, Vehicle vMyCar, int iSeat, PedFixtures Fixtures, int iReload)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("OnlineWardrobe", tEx);
+            GetLogging("OnlineWardrobe, iSeat == " + iSeat + ", iReload == " + iReload);
+
+            if (iReload != -1)
+                iReload = ReteaveBrain(iReload);
 
             if (Fixtures != null)
             {
@@ -3615,13 +3681,14 @@ namespace OnlinePlayerz
                 OnlineSavedWard(Pedx, DisBank);
             }
 
-
-            NpcBrains(Pedx, vMyCar, iSeat, Fixtures, iReload);
+            if (iReload != -1)
+                NpcBrains(Pedx, vMyCar, iSeat, Fixtures, PedList[iReload].iLevel);
+            else
+                NpcBrains(Pedx, vMyCar, iSeat, Fixtures, iReload);
         }
         private void OnlineSavedWard(Ped Pedx, ClothBank MyCloths)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("OnlineSavedWard", tEx);
+            GetLogging("OnlineSavedWard");
 
             Function.Call(Hash.CLEAR_ALL_PED_PROPS, Pedx);
 
@@ -3633,8 +3700,7 @@ namespace OnlinePlayerz
         }
         private void Scaleform_PLAYER_LIST()
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("Scaleform_PLAYER_LIST", tEx);
+            GetLogging("Scaleform_PLAYER_LIST");
 
             iScale = Function.Call<int>((Hash)0x11FE353CF9733E6F, "INSTRUCTIONAL_BUTTONS");
 
@@ -3688,7 +3754,12 @@ namespace OnlinePlayerz
 
             Function.Call(Hash._PUSH_SCALEFORM_MOVIE_FUNCTION, iScale, "SET_DATA_SLOT");
             Function.Call(Hash._PUSH_SCALEFORM_MOVIE_FUNCTION_PARAMETER_INT, iAddOns);
-            Function.Call(Hash._PUSH_SCALEFORM_MOVIE_FUNCTION_PARAMETER_STRING, "Players in Session ;  ");
+            if (bDisabled)
+                Function.Call(Hash._PUSH_SCALEFORM_MOVIE_FUNCTION_PARAMETER_STRING, "Mod Disabled");
+            else
+                Function.Call(Hash._PUSH_SCALEFORM_MOVIE_FUNCTION_PARAMETER_STRING, "Players in Session ;  ");
+
+
             Function.Call(Hash._POP_SCALEFORM_MOVIE_FUNCTION_VOID);
 
             Function.Call(Hash._PUSH_SCALEFORM_MOVIE_FUNCTION, iScale, "DRAW_INSTRUCTIONAL_BUTTONS");
@@ -3699,8 +3770,7 @@ namespace OnlinePlayerz
         }
         private void CloseBaseHelpBar()
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("CloseBaseHelpBar", tEx);
+            GetLogging("CloseBaseHelpBar");
 
             unsafe
             {
@@ -3710,34 +3780,40 @@ namespace OnlinePlayerz
 
             bPlayerList = false;
         }
-        private void PlayScales(bool bInALoop)
+        private void PlayScales()
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("PlayScales", tEx);
+            GetLogging("PlayScales");
 
             Scaleform_PLAYER_LIST();
-            if (bInALoop)
-                TopLeftUI("Press" + ControlSybols(iClearPlayList) + "to clear the session");
+
+            if (bDisabled)
+                TopLeftUI("Press" + ControlSybols(iDisableMod) + " to enable mod");
+            else
+                TopLeftUI("Press" + ControlSybols(iClearPlayList) + "to clear the session and " + ControlSybols(iDisableMod) + " to disable mod");
+
             int iStick = Game.GameTime + 8000;
-            while (iStick > Game.GameTime && !ButtonDown(iClearPlayList, false))
+            while (iStick > Game.GameTime && !ButtonDown(iClearPlayList, false) && !ButtonDown(iDisableMod, false))
             {
                 Function.Call(Hash.DRAW_SCALEFORM_MOVIE_FULLSCREEN, iScale, 255, 255, 255, 255);
                 Script.Wait(1);
             }
             CloseBaseHelpBar();
 
-            if (ButtonDown(iClearPlayList, false) && bInALoop)
+            if (ButtonDown(iClearPlayList, false) && !bDisabled)
                 LaggOut();
+            else if (ButtonDown(iDisableMod, false))
+                bDisabled = !bDisabled;
         }
         private void FireOrb(int MyBrian, Ped Target)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("FireOrb, MyBrian == " + MyBrian, tEx);
+            GetLogging("FireOrb, MyBrian == " + MyBrian);
 
             Ped pFired = Game.Player.Character;
 
             if (MyBrian != -1)
             {
+                MyBrian = ReteaveBrain(MyBrian);
+
                 List<Vector3> FacList = new List<Vector3>();
                 FacList.Add(new Vector3(1871.856f, 280.2685f, 164.3017f));
                 FacList.Add(new Vector3(2074.258f, 1749.33f, 104.5142f));
@@ -3749,7 +3825,7 @@ namespace OnlinePlayerz
                 FacList.Add(new Vector3(18.59906f, 2610.94f, 85.99267f));
                 FacList.Add(new Vector3(1286.877f, 2846.37f, 49.39426f));
 
-                ClearPedBlips(MyBrian);
+                ClearPedBlips(PedList[MyBrian].iLevel);
                 PedList[MyBrian].ThisBlip = LocalBlip(FacList[RandInt(0, FacList.Count - 1)], 590, PedList[MyBrian].sMyName);
 
                 pFired = PedList[MyBrian].ThisPed;
@@ -3768,14 +3844,13 @@ namespace OnlinePlayerz
                 {
                     OrbLoad(PedList[MyBrian].sMyName);
                     Script.Wait(4000);
-                    PedCleaning(MyBrian, "left", false);
+                    PedCleaning(PedList[MyBrian].iLevel, "left", false);
                 }
             }
         }
         private void OrbExp(Ped PFired, Vector3 Pos1, Vector3 Pos2, Vector3 Pos3, Vector3 Pos4, Vector3 Pos5)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("OrbExp, Pos1 == " + Pos1, tEx);
+            GetLogging("OrbExp, Pos1 == " + Pos1);
 
             Function.Call(Hash.ADD_OWNED_EXPLOSION, PFired.Handle, Pos2.X, Pos2.Y, Pos2.Z, 49, 1.00f, true, false, 1.00f);
             Function.Call(Hash.ADD_OWNED_EXPLOSION, PFired.Handle, Pos3.X, Pos3.Y, Pos3.Z, 49, 1.00f, true, false, 1.00f);
@@ -3788,8 +3863,7 @@ namespace OnlinePlayerz
         }
         private void OrbLoad(string sWhoDidit)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("OrbLoa", tEx);
+            GetLogging("OrbLoad, sWhoDidit == " + sWhoDidit);
 
             UI.Notify(sWhoDidit +" obliterated you with the Orbital Cannon.");
 
@@ -4223,58 +4297,60 @@ namespace OnlinePlayerz
         }
         private void WhileYouDead(string Kellar, int iKills, int iKilled, Ped Peddy)
         {
-            using (StreamWriter tEx = File.AppendText(sBeeLogs))
-                BeeLog("WhileYouDead, string == " + Kellar, tEx);
+            GetLogging("WhileYouDead, string == " + Kellar + ", iKills == " + iKills + ", iKilled == " + iKilled);
 
             while (Game.Player.Character.GetKiller() == Peddy)
                 Script.Wait(1);
             Script.Wait(1000);
             UI.Notify("You  " + iKills + " - " + iKilled + " " + Kellar);
         }
-        private void PlayerZerosAI(bool bInALoop)
+        private void PlayerZerosAI()
         {
             if (ButtonDown(iGetlayList, false) && !bPlayerList)
-                PlayScales(bInALoop);
-
-            if (ThisBrian(iNpcList) != null)
+                PlayScales();
+            if (bDisabled)
             {
-                int iBe = iNpcList;
-                if (PedList[iBe].DirBlip != null)
-                    BlipDirect(PedList[iBe].DirBlip, PedList[iBe].ThisPed.Heading);
+                if (ThisBrian(0) != null || ThisAFKer(0) != null)
+                    LaggOut();
+            }
+            else
+            {
+                if (ThisBrian(iNpcList) != null)
+                {
+                    int iBe = iNpcList;
+                    if (PedList[iBe].DirBlip != null)
+                        BlipDirect(PedList[iBe].DirBlip, PedList[iBe].ThisPed.Heading);
 
-                if (PedList[iBe].iTimeOn < Game.GameTime && bInALoop)
-                {
-                    GetOutVehicle(PedList[iBe].ThisPed, iBe);
-                    PedCleaning(iBe, "left", false);
-                }
-                else if (Game.Player.Character.GetKiller() == PedList[iBe].ThisPed && bInALoop)
-                {
-                    PedList[iBe].iKills += 1;
-                    WhileYouDead(PedList[iBe].sMyName, PedList[iBe].iKilled, PedList[iBe].iKills, PedList[iBe].ThisPed);
-                    if (iAggression < 6)
-                        PedCleaning(iBe, "left", false);
-                }
-                else if (PedList[iBe].ThisPed.IsDead)
-                {
-                    if (PedList[iBe].iDeathSequence == 0)
+                    if (PedList[iBe].ThisPed == null)
                     {
-                        if (PedList[iBe].ThisVeh != null)
-                        {
-                            EmptyVeh(PedList[iBe].ThisVeh);
-                            PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
-                            PedList[iBe].ThisVeh = null;
-                        }
 
-                        if (PedList[iBe].iKilled > RandInt(13, 22) || iAggression < 2)
+                    }
+                    else if (PedList[iBe].iTimeOn < Game.GameTime)
+                    {
+                        GetOutVehicle(PedList[iBe].ThisPed, PedList[iBe].iLevel);
+                        PedCleaning(PedList[iBe].iLevel, "left", false);
+                    }
+                    else if (Game.Player.Character.GetKiller() == PedList[iBe].ThisPed)
+                    {
+                        PedList[iBe].iKills += 1;
+                        WhileYouDead(PedList[iBe].sMyName, PedList[iBe].iKilled, PedList[iBe].iKills, PedList[iBe].ThisPed);
+                        if (iAggression < 6)
+                            PedCleaning(PedList[iBe].iLevel, "left", false);
+                    }
+                    else if (PedList[iBe].ThisPed.IsDead)
+                    {
+                        if (PedList[iBe].iDeathSequence == 0)
                         {
-                            if (bInALoop)
-                                PedCleaning(iBe, "left", false);
-                        }
-                        else
-                        {
+                            if (PedList[iBe].ThisVeh != null)
+                            {
+                                EmptyVeh(PedList[iBe].ThisVeh);
+                                PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
+                                PedList[iBe].ThisVeh = null;
+                            }
+
                             int iDie = WhoShotMe(PedList[iBe].ThisPed);
 
-                            ClearPedBlips(iBe);
+                            ClearPedBlips(PedList[iBe].iLevel);
 
                             if (PedList[iBe].ThisPed.GetKiller() == Game.Player.Character)
                             {
@@ -4297,321 +4373,344 @@ namespace OnlinePlayerz
                             PedList[iBe].iDeathTime = Game.GameTime + 10000;
                             PedList[iBe].iTimeOn += 60000;
                         }
-                    }
-                    else if (PedList[iBe].iDeathSequence == 1 || PedList[iBe].iDeathSequence == 3 || PedList[iBe].iDeathSequence == 5 || PedList[iBe].iDeathSequence == 7)
-                    {
-                        if (PedList[iBe].iDeathTime < Game.GameTime)
-                        {
-                            PedList[iBe].ThisPed.Alpha = 80;
-                            PedList[iBe].iDeathSequence += 1;
-                            PedList[iBe].iDeathTime = Game.GameTime + 500;
-                        }
-                    }
-                    else if (PedList[iBe].iDeathSequence == 2 || PedList[iBe].iDeathSequence == 4 || PedList[iBe].iDeathSequence == 6)
-                    {
-                        if (PedList[iBe].iDeathTime < Game.GameTime)
-                        {
-                            PedList[iBe].ThisPed.Alpha = 255;
-                            PedList[iBe].iDeathSequence += 1;
-                            PedList[iBe].iDeathTime = Game.GameTime + 500;
-                        }
-                    }
-                    else if (PedList[iBe].iDeathSequence == 8)
-                    {
-                        if (bInALoop)
+                        else if (PedList[iBe].iDeathSequence == 1 || PedList[iBe].iDeathSequence == 3 || PedList[iBe].iDeathSequence == 5 || PedList[iBe].iDeathSequence == 7)
                         {
                             if (PedList[iBe].iDeathTime < Game.GameTime)
                             {
-                                if (PedList[iBe].iKilled > 15 && PedList[iBe].iKills == 0 && iAggression > 7)
-                                    FireOrb(iBe, Game.Player.Character);
-                                else
-                                {
-                                    ClearPedBlips(iBe);
-                                    PedList[iBe].iDeathSequence = 0;
-                                    PedList[iBe].ThisPed.Delete();
-                                    Vector3 Posy = FindAPed(Game.Player.Character.Position, 95.00f, true, iBe);
-                                }
+                                PedList[iBe].ThisPed.Alpha = 80;
+                                PedList[iBe].iDeathSequence += 1;
+                                PedList[iBe].iDeathTime = Game.GameTime + 500;
                             }
                         }
-                    }
-                }
-                else if (PedList[iBe].ThisPed.Position.Z < -90.00f)
-                {
-                    PedList[iBe].ThisPed.Kill();
-                }
-                else if (PedList[iBe].bHacker && !bHackEvent)
-                {
-                    if (PedList[iBe].ThisPed.Position.DistanceTo(Game.Player.Character.Position) < 40.00f)
-                    {
-                        bHackEvent = true;
-                        HackerTime(PedList[iBe].ThisPed);
-                    }
-                }
-                else if (PedList[iBe].bSessionJumper)
-                {
-                    if (PedList[iBe].ThisPed.Position.DistanceTo(Game.Player.Character.Position) < 10.00f)
-                        PedCleaning(iBe, "has disappeared", true);
-                }
-                else if (PedList[iBe].bDriver)
-                {
-                    if (PedList[iBe].ThisPed.IsInVehicle())
-                    {
-                        if (PedList[iBe].bFollower)
+                        else if (PedList[iBe].iDeathSequence == 2 || PedList[iBe].iDeathSequence == 4 || PedList[iBe].iDeathSequence == 6)
                         {
-                            if (Game.Player.Character.IsInVehicle(PedList[iBe].ThisPed.CurrentVehicle))
+                            if (PedList[iBe].iDeathTime < Game.GameTime)
                             {
-                                if (Game.IsWaypointActive)
-                                {
-                                    if (World.GetWaypointPosition() != LetsGoHere)
-                                    {
-                                        LetsGoHere = World.GetWaypointPosition();
-                                        DriveToooDest(PedList[iBe].ThisPed, LetsGoHere);
-                                    }
-                                }
-
-                            }
-                            else if (Game.Player.Character.IsInVehicle())
-                            {
-                                if (PedList[iBe].ThisBlip == null)
-                                    PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 225, PedList[iBe].sMyName, PedList[iBe].iColours);
-
-                                if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) > 25.00f)
-                                {
-                                    if (PedList[iBe].iFindPlayer < Game.GameTime)
-                                    {
-                                        PedList[iBe].iFindPlayer = Game.GameTime + 5000;
-                                        DriveTooo(PedList[iBe].ThisPed, false);
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                GetOutVehicle(PedList[iBe].ThisPed, iBe);
-                                if (PedList[iBe].ThisVeh != null)
-                                {
-                                    PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
-                                    PedList[iBe].ThisVeh = null;
-                                }
-                                PedList[iBe].bPassenger = false;
-                                PedList[iBe].bDriver = false;
-                                Function.Call(Hash.TASK_FOLLOW_TO_OFFSET_OF_ENTITY, PedList[iBe].ThisPed, Game.Player.Character.Handle, 0.0f, 3.0f, 0.0f, 1.0f, -1, 0.5f, true);
+                                PedList[iBe].ThisPed.Alpha = 255;
+                                PedList[iBe].iDeathSequence += 1;
+                                PedList[iBe].iDeathTime = Game.GameTime + 500;
                             }
                         }
-                        else if (PedList[iBe].bApprochPlayer)
+                        else if (PedList[iBe].iDeathSequence == 8)
                         {
-                            if (iAggression < 6 && PedList[iBe].bFriendly && iFollow < 8)
+                            if (!bStuckOnYou)
                             {
-                                if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) < 5.00f)
+                                if (PedList[iBe].iDeathTime < Game.GameTime)
                                 {
-                                    if (!PedList[iBe].bHorny)
+                                    if (PedList[iBe].iKilled > RandInt(13, 22) || iAggression < 2)
                                     {
-                                        PedList[iBe].bHorny = true;
-                                        PedList[iBe].ThisVeh.SoundHorn(3000);
-                                        TopLeftUI("Press" + ControlSybols(23) + "to enter vehicle");
+                                        PedCleaning(PedList[iBe].iLevel, "left", false);
                                     }
-                                    else if (!Game.Player.Character.IsInVehicle())
-                                    {
-                                        if (ButtonDown(23, true) && bInALoop)
-                                        {
-                                            PedList[iBe].iTimeOn += 60000;
-                                            EnterAnyVeh(PedList[iBe].ThisVeh, Game.Player.Character, 2.00f, -1);
-                                        }
-                                    }
+                                    else if (PedList[iBe].iKilled > 15 && PedList[iBe].iKills == 0 && iAggression > 7)
+                                        FireOrb(PedList[iBe].iLevel, Game.Player.Character);
                                     else
                                     {
-                                        PedList[iBe].bApprochPlayer = false;
-                                        if (Game.Player.Character.IsInVehicle(PedList[iBe].ThisVeh))
+                                        ClearPedBlips(PedList[iBe].iLevel);
+                                        PedList[iBe].iDeathSequence = 10;
+                                        PedList[iBe].ThisPed.Delete();
+                                        PedList[iBe].ThisPed = null;
+                                        bStuckOnYou = true;
+                                        Vector3 Posy = FindAPed(Game.Player.Character.Position, 95.00f, true, PedList[iBe].iLevel);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else if (PedList[iBe].ThisPed.Position.Z < -90.00f)
+                    {
+                        PedList[iBe].ThisPed.Kill();
+                    }
+                    else if (PedList[iBe].bHacker && !bHackEvent)
+                    {
+                        if (PedList[iBe].ThisPed.Position.DistanceTo(Game.Player.Character.Position) < 40.00f)
+                        {
+                            bHackEvent = true;
+                            HackerTime(PedList[iBe].ThisPed);
+                        }
+                    }
+                    else if (PedList[iBe].bSessionJumper)
+                    {
+                        if (PedList[iBe].ThisPed.Position.DistanceTo(Game.Player.Character.Position) < 10.00f)
+                            PedCleaning(PedList[iBe].iLevel, "has disappeared", true);
+                    }
+                    else if (PedList[iBe].bDriver)
+                    {
+                        if (PedList[iBe].ThisPed.IsInVehicle())
+                        {
+                            if (PedList[iBe].bFollower)
+                            {
+                                if (Game.Player.Character.IsInVehicle(PedList[iBe].ThisPed.CurrentVehicle))
+                                {
+                                    if (Game.IsWaypointActive)
+                                    {
+                                        if (World.GetWaypointPosition() != LetsGoHere)
                                         {
-                                            PedList[iBe].iColours = 38;
-                                            PedList[iBe].bFollower = true;
-                                            FolllowTheLeader(PedList[iBe].ThisPed);
-                                            iFollow += 1;
+                                            LetsGoHere = World.GetWaypointPosition();
+                                            DriveToooDest(PedList[iBe].ThisPed, LetsGoHere);
                                         }
-                                        DriveAround(PedList[iBe].ThisPed);
                                     }
+
                                 }
-                                else if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) > 25.00f)
+                                else if (Game.Player.Character.IsInVehicle())
                                 {
-                                    if (PedList[iBe].iFindPlayer < Game.GameTime)
+                                    if (PedList[iBe].ThisBlip == null)
+                                        PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 225, PedList[iBe].sMyName, PedList[iBe].iColours);
+
+                                    if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) > 25.00f)
                                     {
-                                        PedList[iBe].iFindPlayer = Game.GameTime + 5000;
-                                        DriveTooo(PedList[iBe].ThisPed, false);
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) < 5.00f)
-                                {
-                                    PedList[iBe].bApprochPlayer = false;
-                                    PedList[iBe].ThisVeh.SoundHorn(3000);
-                                }
-                                else if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) > 45.00f)
-                                {
-                                    if (PedList[iBe].iFindPlayer < Game.GameTime)
-                                    {
-                                        PedList[iBe].iFindPlayer = Game.GameTime + 5000;
-                                        DriveBye(PedList[iBe].ThisPed);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        if (PedList[iBe].ThisVeh != null)
-                        {
-                            PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
-                            PedList[iBe].ThisVeh = null;
-                        }
-                        PedList[iBe].bApprochPlayer = false;
-                        PedList[iBe].bDriver = false;
-                        ClearPedBlips(iBe);
-                        PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
-                        PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
-                    }
-                }
-                else if (PedList[iBe].bPassenger)
-                {
-                    if (PedList[iBe].bFollower)
-                    {
-                        if (!Game.Player.Character.IsInVehicle())
-                        {
-                            PedList[iBe].bPassenger = false;
-                            ClearPedBlips(iBe);
-                            PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
-                            PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
-                            PedList[iBe].ThisPed.Task.LeaveVehicle();
-                            Function.Call(Hash.TASK_FOLLOW_TO_OFFSET_OF_ENTITY, PedList[iBe].ThisPed, Game.Player.Character.Handle, 0.0f, 3.0f, 0.0f, 1.0f, -1, 0.5f, true);
-                        }
-                    }
-                    else
-                    {
-                        if (!PedList[iBe].ThisPed.IsInVehicle())
-                        {
-                            PedList[iBe].bPassenger = false;
-                            ClearPedBlips(iBe);
-                            PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
-                            PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
-                        }
-                    }
-                }
-                else if (PedList[iBe].bFollower)
-                {
-                    if (Game.Player.Character.IsInVehicle() && bInALoop)
-                    {
-                        PedList[iBe].bPassenger = true;
-                        Vehicle DisVeh = Game.Player.Character.CurrentVehicle;
-                        EnterAnyVeh(DisVeh, PedList[iBe].ThisPed, 2.00f, iBe);
-                        ClearPedBlips(iBe);
-                    }
-                }
-                else if (PedList[iBe].bFriendly)
-                {
-                    if (PedList[iBe].ThisPed.HasBeenDamagedBy(Game.Player.Character) || PedList[iBe].ThisPed.IsInCombatAgainst(Game.Player.Character) && iAggression > 2)
-                    {
-                        ClearPedBlips(iBe);
-                        ExMember(PedList[iBe].ThisPed);
-                        PedList[iBe].iColours = 1;
-                        FightPlayer(PedList[iBe].ThisPed, false);
-                        PedList[iBe].bFriendly = false;
-                        if (PedList[iBe].bFollower)
-                        {
-                            PedList[iBe].bFollower = false;
-                            iFollow -= 1;
-                        }
-                        PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
-                        PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
-                    }
-                    else
-                    {
-                        if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) < 7.00f && !PedList[iBe].ThisPed.IsInVehicle() && iFollow < 8)
-                        {
-                            if (Game.Player.Character.IsInVehicle())
-                            {
-                                if (Game.Player.Character.SeatIndex == VehicleSeat.Driver)
-                                {
-                                    if (!PedList[iBe].bHorny2)
-                                    {
-                                        TopLeftUI("Press" + ControlSybols(86) + "to attract the players attention");
-                                        PedList[iBe].bHorny2 = true;
-                                    }
-                                    else if (ButtonDown(86, false))
-                                    {
-                                        if (iAggression < 9)
+                                        if (PedList[iBe].iFindPlayer < Game.GameTime)
                                         {
-                                            ClearPedBlips(iBe);
-
-                                            PedList[iBe].iColours = 38;
-                                            PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
-                                            PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
-
-                                            FolllowTheLeader(PedList[iBe].ThisPed);
-                                            PedList[iBe].iTimeOn += 60000;
-                                            iFollow += 1;
-
-                                            PedList[iBe].bFollower = true;
+                                            PedList[iBe].iFindPlayer = Game.GameTime + 5000;
+                                            DriveTooo(PedList[iBe].ThisPed, false);
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    GetOutVehicle(PedList[iBe].ThisPed, PedList[iBe].iLevel);
+                                    if (PedList[iBe].ThisVeh != null)
+                                    {
+                                        PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
+                                        PedList[iBe].ThisVeh = null;
+                                    }
+                                    PedList[iBe].bPassenger = false;
+                                    PedList[iBe].bDriver = false;
+                                    Function.Call(Hash.TASK_FOLLOW_TO_OFFSET_OF_ENTITY, PedList[iBe].ThisPed, Game.Player.Character.Handle, 0.0f, 3.0f, 0.0f, 1.0f, -1, 0.5f, true);
+                                }
+                            }
+                            else if (PedList[iBe].bApprochPlayer)
+                            {
+                                if (iAggression < 6 && PedList[iBe].bFriendly && iFollow < 8)
+                                {
+                                    if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) < 5.00f)
+                                    {
+                                        if (!PedList[iBe].bHorny)
+                                        {
+                                            PedList[iBe].bHorny = true;
+                                            PedList[iBe].ThisVeh.SoundHorn(3000);
+                                            TopLeftUI("Press" + ControlSybols(23) + "to enter vehicle");
+                                        }
+                                        else if (!Game.Player.Character.IsInVehicle())
+                                        {
+                                            if (ButtonDown(23, true))
+                                            {
+                                                PedList[iBe].iTimeOn += 60000;
+                                                EnterAnyVeh(PedList[iBe].ThisVeh, Game.Player.Character, 2.00f, -1);
+                                            }
                                         }
                                         else
                                         {
-                                            ClearPedBlips(iBe);
-                                            ExMember(PedList[iBe].ThisPed);
-                                            FightPlayer(PedList[iBe].ThisPed, false);
-                                            PedList[iBe].iColours = 3;
-                                            PedList[iBe].bFriendly = false;
-                                            PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
-                                            PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
+                                            PedList[iBe].bApprochPlayer = false;
+                                            if (Game.Player.Character.IsInVehicle(PedList[iBe].ThisVeh))
+                                            {
+                                                PedList[iBe].iColours = 38;
+                                                PedList[iBe].bFollower = true;
+                                                FolllowTheLeader(PedList[iBe].ThisPed);
+                                                iFollow += 1;
+                                            }
+                                            DriveAround(PedList[iBe].ThisPed);
+                                        }
+                                    }
+                                    else if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) > 25.00f)
+                                    {
+                                        if (PedList[iBe].iFindPlayer < Game.GameTime)
+                                        {
+                                            PedList[iBe].iFindPlayer = Game.GameTime + 5000;
+                                            DriveTooo(PedList[iBe].ThisPed, false);
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) < 5.00f)
+                                    {
+                                        PedList[iBe].bApprochPlayer = false;
+                                        PedList[iBe].ThisVeh.SoundHorn(3000);
+                                    }
+                                    else if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) > 45.00f)
+                                    {
+                                        if (PedList[iBe].iFindPlayer < Game.GameTime)
+                                        {
+                                            PedList[iBe].iFindPlayer = Game.GameTime + 5000;
+                                            DriveBye(PedList[iBe].ThisPed);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if (PedList[iBe].ThisVeh != null)
+                            {
+                                PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
+                                PedList[iBe].ThisVeh = null;
+                            }
+                            PedList[iBe].bApprochPlayer = false;
+                            PedList[iBe].bDriver = false;
+                            ClearPedBlips(PedList[iBe].iLevel);
+                            PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
+                            PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
+                        }
+                    }
+                    else if (PedList[iBe].bPassenger)
+                    {
+                        if (PedList[iBe].bFollower)
+                        {
+                            if (!Game.Player.Character.IsInVehicle())
+                            {
+                                PedList[iBe].bPassenger = false;
+                                ClearPedBlips(PedList[iBe].iLevel);
+                                PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
+                                PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
+                                PedList[iBe].ThisPed.Task.LeaveVehicle();
+                                Function.Call(Hash.TASK_FOLLOW_TO_OFFSET_OF_ENTITY, PedList[iBe].ThisPed, Game.Player.Character.Handle, 0.0f, 3.0f, 0.0f, 1.0f, -1, 0.5f, true);
+                            }
+                        }
+                        else
+                        {
+                            if (!PedList[iBe].ThisPed.IsInVehicle())
+                            {
+                                PedList[iBe].bPassenger = false;
+                                ClearPedBlips(PedList[iBe].iLevel);
+                                PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
+                                PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
+                            }
+                        }
+                    }
+                    else if (PedList[iBe].bFollower)
+                    {
+                        if (Game.Player.Character.IsInVehicle())
+                        {
+                            PedList[iBe].bPassenger = true;
+                            Vehicle DisVeh = Game.Player.Character.CurrentVehicle;
+                            EnterAnyVeh(DisVeh, PedList[iBe].ThisPed, 2.00f, PedList[iBe].iLevel);
+                            ClearPedBlips(PedList[iBe].iLevel);
+                        }
+                    }
+                    else if (PedList[iBe].bFriendly)
+                    {
+                        if (PedList[iBe].ThisPed.HasBeenDamagedBy(Game.Player.Character) || PedList[iBe].ThisPed.IsInCombatAgainst(Game.Player.Character) && iAggression > 2)
+                        {
+                            ClearPedBlips(PedList[iBe].iLevel);
+                            ExMember(PedList[iBe].ThisPed);
+                            PedList[iBe].iColours = 1;
+                            FightPlayer(PedList[iBe].ThisPed, false);
+                            PedList[iBe].bFriendly = false;
+                            if (PedList[iBe].bFollower)
+                            {
+                                PedList[iBe].bFollower = false;
+                                iFollow -= 1;
+                            }
+                            PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
+                            PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
+                        }
+                        else
+                        {
+                            if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) < 7.00f && !PedList[iBe].ThisPed.IsInVehicle() && iFollow < 8)
+                            {
+                                if (Game.Player.Character.IsInVehicle())
+                                {
+                                    if (Game.Player.Character.SeatIndex == VehicleSeat.Driver)
+                                    {
+                                        if (!PedList[iBe].bHorny2)
+                                        {
+                                            TopLeftUI("Press" + ControlSybols(86) + "to attract the players attention");
+                                            PedList[iBe].bHorny2 = true;
+                                        }
+                                        else if (ButtonDown(86, false))
+                                        {
+                                            if (iAggression < 9)
+                                            {
+                                                ClearPedBlips(PedList[iBe].iLevel);
+
+                                                PedList[iBe].iColours = 38;
+                                                PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
+                                                PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
+
+                                                FolllowTheLeader(PedList[iBe].ThisPed);
+                                                PedList[iBe].iTimeOn += 60000;
+                                                iFollow += 1;
+
+                                                PedList[iBe].bFollower = true;
+                                            }
+                                            else
+                                            {
+                                                ClearPedBlips(PedList[iBe].iLevel);
+                                                ExMember(PedList[iBe].ThisPed);
+                                                FightPlayer(PedList[iBe].ThisPed, false);
+                                                PedList[iBe].iColours = 3;
+                                                PedList[iBe].bFriendly = false;
+                                                PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
+                                                PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                }
-                else
-                {
-                    if (PedList[iBe].ThisPed.Position.DistanceTo(Game.Player.Character.Position) > 350.00f && iAggression > 4 && PedList[iBe].iDeathSequence == 0 && bInALoop)
+                    else
                     {
-                        if (PedList[iBe].ThisVeh == null)
-                            AirAttack(iBe);
-                    }
-                    else if (bPiggyBack)
-                    {
-                        if (PedList[iBe].ThisPed.IsInCombatAgainst(Game.Player.Character))
+                        if (!PedList[iBe].bOffRadar && PedList[iBe].iOffRadar == -1)
                         {
-                            if (iOrbBurnOut < Game.GameTime)
-                            {
-                                iOrbBurnOut = Game.GameTime + 25000;
 
-                                FireOrb(-1, PedList[iBe].ThisPed);
+                            PedList[iBe].iOffRadar = Game.GameTime + 300000;
+                            ClearPedBlips(PedList[iBe].iLevel);
+                            UI.Notify("~h~" + PedList[iBe].sMyName + "~s~ has gone off radar");
+                        }
+                        else if (PedList[iBe].bOffRadar)
+                        {
+                            if (PedList[iBe].iOffRadar < Game.GameTime)
+                            {
+                                PedList[iBe].bOffRadar = false;
+                                ClearPedBlips(PedList[iBe].iLevel);
+                                PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
+                                PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
+                            }
+                        }
+                        else if (PedList[iBe].ThisPed.Position.DistanceTo(Game.Player.Character.Position) > 350.00f && iAggression > 4 && PedList[iBe].iDeathSequence == 0 && !bStuckOnYou)
+                        {
+                            if (PedList[iBe].ThisVeh == null)
+                                AirAttack(PedList[iBe].iLevel);
+                        }
+                        else if (bPiggyBack)
+                        {
+                            if (PedList[iBe].ThisPed.IsInCombatAgainst(Game.Player.Character))
+                            {
+                                if (iOrbBurnOut < Game.GameTime)
+                                {
+                                    iOrbBurnOut = Game.GameTime + 25000;
+
+                                    FireOrb(-1, PedList[iBe].ThisPed);
+                                }
                             }
                         }
                     }
+
+                    iNpcList += 1;
                 }
+                else
+                    iNpcList = 0;
 
-                iNpcList += 1;
-            }
-            else
-                iNpcList = 0;
-
-            if (ThisAFKer(iBlpList) != null)
-            {
-                AfkPlayer HouseBlip = ThisAFKer(iBlpList);
-
-                if (HouseBlip.iTimeOn < Game.GameTime)
+                if (ThisAFKer(iBlpList) != null)
                 {
-                    DeListingBrains(false, iBlpList, true);
-                    iCurrentPlayerz -= 1;
-                }
-                iBlpList += 1;
-            }
-            else
-                iBlpList = 0;
+                    AfkPlayer HouseBlip = ThisAFKer(iBlpList);
 
-            if (bInALoop)
-            {
-                if (BTimer(1))
-                    NewPlayer();
+                    if (HouseBlip.iTimeOn < Game.GameTime)
+                    {
+                        DeListingBrains(false, iBlpList, true);
+                        iCurrentPlayerz -= 1;
+                    }
+                    iBlpList += 1;
+                }
+                else
+                    iBlpList = 0;
+
+                if (!bStuckOnYou && bSearching)
+                {
+                    if (BTimer(1))
+                        NewPlayer();
+                }
             }
         }
         private void OnTick(object sender, EventArgs e)
@@ -4626,7 +4725,7 @@ namespace OnlinePlayerz
                 }
             }
             else
-                PlayerZerosAI(true);
+                PlayerZerosAI();
         }
     }
 }
