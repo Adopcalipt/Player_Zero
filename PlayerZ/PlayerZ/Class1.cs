@@ -5,6 +5,8 @@ using System.Drawing;
 using System.IO;
 using System.Xml;
 using System.Windows.Forms;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Xml.Serialization;
 using GTA;
 using GTA.Native;
@@ -15,77 +17,207 @@ namespace OnlinePlayerz
     public class Main : Script
     {
         private ScriptSettings GetKeys;
+
+        private bool bTrainM = true;//set the test then set to false
+        private bool bDebugger = false;
+        private bool bLoadUp = true;
+        private bool bPlayerList = false;
+        private bool bHeistPop = true;
+        private bool bHackerIn = false;
+        private bool bPiggyBack = false;
+        private bool bHackEvent = false;
+        private bool bSpaceWeaps = false;       
+        private bool bDisabled = false;
+
+        private readonly string sVersion = "1.7";
+        private readonly string sBeeLogs = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/PlayerZLog.txt";
+        private readonly string sMemory = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/PlayerZsMemory.xml";
+        private readonly string sOutfitts = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/Outfits.xml";
+        private readonly string sRandFile = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/RanNum.Xml";
+        private readonly string sPath = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/PZSet.ini";
+
+        private int iMaxPlayers = 29;
+        private int iNpcList = 0;
+        private int iBlpList = 0;
+        private int iRotateFind = 0;
+        private int iFollow = 0;
+        private int iFolPos = 0;
+        private int iCurrentPlayerz = 0;
+        private int iOrbBurnOut = 0;
+        private int iFindingTime = 0;
+        private int iScale = 0;
+        private int iMinWait = 15000;
+        private int iMaxWait = 45000;
+        private int iAccMin = 25;
+        private int iAccMax = 75;
+        private int iMinSession = 60000;
+        private int iMaxSession = 300000;
+        private int iAggression = 5;
+        private int iGetlayList = 19;
+        private int iClearPlayList = 131;
+        private int iDisableMod = 73;
+
+        private int iFollowMe = -1;
+        private int GP_Player = Game.Player.Character.RelationshipGroup;
+        private readonly int Gp_Friend = World.AddRelationshipGroup("FrendlyNPCs");
+        private readonly int GP_Attack = World.AddRelationshipGroup("AttackNPCs");
+        private readonly int Gp_Follow = World.AddRelationshipGroup("FollowerNPCs");
+        private readonly int GP_Mental = World.AddRelationshipGroup("MentalNPCs");
+
+        private Vector3 LetsGoHere = Vector3.Zero;
+
+        private BackUpBrain BlowenMyBrains = new BackUpBrain();
+
+        private List<bool> BeOnOff = new List<bool>();
+        private List<int> iTimers = new List<int>();
+
+        private List<Prop> Plops = new List<Prop>();
+        private List<Vehicle> Vicks = new List<Vehicle>();
+        private List<Vector3> AFKPlayers = new List<Vector3>();
         
-        bool bTrainM = true;//set the test then set to false
-        bool bDebugger = false;
-        bool bLoadUp = true;
-        bool bPlayerList = false;
-        bool bHeistPop = true;
-        bool bHackerIn = false;
-        bool bPiggyBack = false;
-        bool bHackEvent = false;
-        bool bSpaceWeaps = false;
-        bool bDisabled = false;
-        bool bSearching = true;
-        bool bStuckOnYou = false;
+        private List<PlayerBrain> PedList = new List<PlayerBrain>();
+        private List<AfkPlayer> AFKList = new List<AfkPlayer>();
 
-        string Version = "1.4";
-        string sBeeLogs = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/PlayerZLog.txt";
-        string sMemory = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/PlayerZsMemory.xml";
-        string sTheIni = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/PlayerZSettings.ini";
-        string sOutfitts = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/Outfits.xml";
+        private List<ClothBank> MaleCloth = new List<ClothBank>();
+        private List<ClothBank> FemaleCloth = new List<ClothBank>();
 
-        int iMaxPlayers = 29;
-        int iNpcList = 0;
-        int iBlpList = 0;
-        int iFollow = 0;
-        int iCurrentPlayerz = 0;
-        int iOrbBurnOut = 0;
-        int iScale = 0;
-        int iMinWait = 15000;
-        int iMaxWait = 45000;
-        int iAccMin = 25;
-        int iAccMax = 75;
-        int iMinSession = 30000;
-        int iMaxSession = 475000;
-        int iAggression = 5;
-        int iGetlayList = 19;
-        int iClearPlayList = 131;
-        int iDisableMod = 28;
+        private PositionDirect FindMe = null;
+        private List<FindVeh> MakeCarz = new List<FindVeh>();
+        private List<FindPed> MakeFrenz = new List<FindPed>();
+        private List<GetInAveh> GetInQUe = new List<GetInAveh>();
 
-        int iPlayerGroups = Game.Player.Character.RelationshipGroup;
-        int iAttackingNPCs = World.AddRelationshipGroup("AttackNPCs");
-        int iFollowingNPCs = World.AddRelationshipGroup("FollowerNPCs");
-        int iWarringNPCs = World.AddRelationshipGroup("WarNPCs");
+        private IniFile MyIni = new IniFile();
 
-        Vector3 LetsGoHere = Vector3.Zero;
+        class IniFile   // revision 11
+        {
+            string Path;
+            string EXE = "PZSet";
 
-        BackUpBrain BlowenMyBrains = new BackUpBrain();
+            [DllImport("kernel32", CharSet = CharSet.Unicode)]
+            static extern long WritePrivateProfileString(string Section, string Key, string Value, string FilePath);
 
-        List<bool> BeOnOff = new List<bool>();
-        List<int> iTimers = new List<int>();
-        List<string> sDebuggler = new List<string>();
+            [DllImport("kernel32", CharSet = CharSet.Unicode)]
+            static extern int GetPrivateProfileString(string Section, string Key, string Default, StringBuilder RetVal, int Size, string FilePath);
 
-        List<Prop> Plops = new List<Prop>();
-        List<Vehicle> Vicks = new List<Vehicle>();
-        List<Vector3> AFKPlayers = new List<Vector3>();
+            public IniFile()
+            {
+                Path = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/PZSet.ini";
+            }
+            public string Read(string Key, string Section = null)
+            {
+                var RetVal = new StringBuilder(255);
+                GetPrivateProfileString(Section ?? EXE, Key, "", RetVal, 255, Path);
+                return RetVal.ToString();
+            }
+            public void Write(string Key, string Value, string Section = null)
+            {
+                WritePrivateProfileString(Section ?? EXE, Key, Value, Path);
+            }
+            public void DeleteKey(string Key, string Section = null)
+            {
+                Write(Key, null, Section ?? EXE);
+            }
+            public void DeleteSection(string Section = null)
+            {
+                Write(null, null, Section ?? EXE);
+            }
+            public bool KeyExists(string Key, string Section = null)
+            {
+                return Read(Key, Section).Length > 0;
+            }
+        }
+        public int ReadMyInt(string sTing)
+        {
+            int iNum = 0;
+            int iTimes = 0;
+            for (int i = sTing.Length - 1; i > -1; i--)
+            {
+                int iAdd = 0;
+                string sComp = sTing.Substring(i, 1);
 
-        List<ImNotRandom> iRandList = new List<ImNotRandom>();
-        List<PlayerBrain> PedList = new List<PlayerBrain>();
-        List<AfkPlayer> AFKList = new List<AfkPlayer>();
+                if (sComp == "1")
+                    iAdd = 1;
+                else if (sComp == "2")
+                    iAdd = 2;
+                else if (sComp == "3")
+                    iAdd = 3;
+                else if (sComp == "4")
+                    iAdd = 4;
+                else if (sComp == "5")
+                    iAdd = 5;
+                else if (sComp == "6")
+                    iAdd = 6;
+                else if (sComp == "7")
+                    iAdd = 7;
+                else if (sComp == "8")
+                    iAdd = 8;
+                else if (sComp == "9")
+                    iAdd = 9;
 
-        List<ClothBank> MaleCloth = new List<ClothBank>();
-        List<ClothBank> FemaleCloth = new List<ClothBank>();
-
+                if (iTimes == 0)
+                {
+                    iNum = iAdd;
+                    iTimes = 1;
+                }
+                else
+                    iNum += iAdd * iTimes;
+                iTimes *= 10;
+            }
+            return iNum;
+        }
+        public bool ReadMyBool(string sTing)
+        {
+            bool b = false;
+            if (sTing.Contains("True") || sTing.Contains("true") || sTing.Contains("TRUE"))
+                b = true;
+            return b;
+        }
         public Main()
         {
             Tick += OnTick;
             Interval = 1;
         }
+        private void LoadIniSetts()
+        {
+            GetLogging("LoadSettings");
+            if (File.Exists(sPath))
+            {
+                iAggression = ReadMyInt(MyIni.Read("Aggression", "Settings"));
+                iMaxPlayers = ReadMyInt(MyIni.Read("MaxPlayers", "Settings"));
+                iMinWait = ReadMyInt(MyIni.Read("MinWait", "Settings"));
+                iMaxWait = ReadMyInt(MyIni.Read("MaxWait", "Settings"));
+                iMinSession = ReadMyInt(MyIni.Read("MinSession", "Settings"));
+                iMaxSession = ReadMyInt(MyIni.Read("MaxSession", "Settings"));
+                iAccMin = ReadMyInt(MyIni.Read("MinAccuracy", "Settings"));
+                iAccMax = ReadMyInt(MyIni.Read("MaxAccuracy", "Settings"));
+                bSpaceWeaps = ReadMyBool(MyIni.Read("SpaceWeaps", "Settings"));
+                bDebugger = ReadMyBool(MyIni.Read("Debug", "Settings"));
+                iGetlayList = ReadMyInt(MyIni.Read("Players", "Controls"));
+                iClearPlayList = ReadMyInt(MyIni.Read("ClearPlayers", "Controls"));
+                iDisableMod = ReadMyInt(MyIni.Read("DisableMod", "Controls"));
+            }
+            else
+            {
+                MyIni.Write("Aggression", "" + iAggression + "", "Settings");
+                MyIni.Write("MaxPlayers", "" + iMaxPlayers + "", "Settings");
+                MyIni.Write("MinWait", "" + iMinWait + "", "Settings");
+                MyIni.Write("MaxWait", "" + iMaxWait + "", "Settings");
+                MyIni.Write("MinSession", "" + iMinSession + "", "Settings");
+                MyIni.Write("MaxSession", "" + iMaxSession + "", "Settings");
+                MyIni.Write("MinAccuracy", "" + iAccMin + "", "Settings");
+                MyIni.Write("MaxAccuracy", "" + iAccMax + "", "Settings");
+                MyIni.Write("SpaceWeaps", "" + bSpaceWeaps + "", "Settings");
+                MyIni.Write("Debug", "" + bDebugger + "", "Settings");
+                MyIni.Write("Players", "" + iGetlayList + "", "Controls");
+                MyIni.Write("ClearPlayers", "" + iClearPlayList + "", "Controls");
+                MyIni.Write("DisableMod", "" + iDisableMod + "", "Controls");
+            }
+        }
         private void LoadSettings()
         {
             GetLogging("LoadSettings");
 
+            string sTheIni = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/PlayerZSettings.ini";
             if (File.Exists(sTheIni))
             {
                 GetKeys = ScriptSettings.Load(sTheIni);
@@ -152,23 +284,46 @@ namespace OnlinePlayerz
 
             GetLogging("LoadUp");
 
-            World.SetRelationshipBetweenGroups(Relationship.Hate, iPlayerGroups, iAttackingNPCs);
-            World.SetRelationshipBetweenGroups(Relationship.Hate, iAttackingNPCs, iPlayerGroups);
-            World.SetRelationshipBetweenGroups(Relationship.Companion, iPlayerGroups, iFollowingNPCs);
-            World.SetRelationshipBetweenGroups(Relationship.Companion, iFollowingNPCs, iPlayerGroups);
-            World.SetRelationshipBetweenGroups(Relationship.Hate, iWarringNPCs, iPlayerGroups);
-            World.SetRelationshipBetweenGroups(Relationship.Hate, iPlayerGroups, iWarringNPCs);
-            World.SetRelationshipBetweenGroups(Relationship.Hate, iWarringNPCs, iFollowingNPCs);
-            World.SetRelationshipBetweenGroups(Relationship.Hate, iFollowingNPCs, iWarringNPCs);
-            World.SetRelationshipBetweenGroups(Relationship.Hate, iWarringNPCs, iAttackingNPCs);
-            World.SetRelationshipBetweenGroups(Relationship.Hate, iAttackingNPCs, iWarringNPCs);
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 0, GP_Player, Gp_Follow);
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 0, Gp_Follow, GP_Player);
 
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 2, Gp_Follow, Gp_Friend);
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 2, Gp_Friend, Gp_Follow);
 
-            Function.Call(Hash.SET_PED_AS_GROUP_LEADER, Game.Player.Character.Handle, iFollowingNPCs);
-            Function.Call(Hash.SET_GROUP_FORMATION, iFollowingNPCs, 3);
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 5, GP_Attack, Gp_Follow);
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 5, Gp_Follow, GP_Attack);
+
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 5, GP_Mental, Gp_Follow);
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 5, Gp_Follow, GP_Mental);
+
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 2, GP_Player, Gp_Friend);
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 2, Gp_Friend, GP_Player);
+
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 5, GP_Attack, Gp_Friend);
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 5, Gp_Friend, GP_Attack);
+
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 5, GP_Player, GP_Attack);
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 5, GP_Attack, GP_Player);
+
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 5, GP_Mental, Gp_Friend);
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 5, Gp_Friend, GP_Mental);
+
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 5, GP_Attack, GP_Mental);
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 5, GP_Mental, GP_Attack);
+
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 5, GP_Player, GP_Mental);
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 5, GP_Mental, GP_Player);
+
+            Function.Call(Hash.SET_RELATIONSHIP_BETWEEN_GROUPS, 5, GP_Mental, GP_Mental);
+
+            iFollowMe = Function.Call<int>(Hash.CREATE_GROUP);
+            Function.Call(Hash.SET_PED_AS_GROUP_LEADER, Game.Player.Character.Handle, iFollowMe);
+            Function.Call(Hash.SET_GROUP_FORMATION, iFollowMe, 3);
+
             iTimers.Clear();
             SetBTimer(30000, -1);
             SetBTimer(RandInt(iMinWait, iMaxWait), -1);
+            LoadIniSetts();
             BuildList();
             FindMisfits();
         }
@@ -195,21 +350,94 @@ namespace OnlinePlayerz
             }
             return bIntime;
         }
-        public bool BOnBOff(int iBee)
+        public class RandomPlusList
         {
-            if (BeOnOff.Count == 0)
+            public List<RandomPlus> BigRanList { get; set; }
+
+            public RandomPlusList()
             {
-                for (int i = 0; i < 25; i++)
-                    BeOnOff.Add(false);
+                BigRanList = new List<RandomPlus>();
             }
+        }
+        public class RandomPlus
+        {
+            public List<int> RandNums { get; set; }
 
-            bool bAlt = false;
+            public RandomPlus()
+            {
+                RandNums = new List<int>();
+            }
+        }
+        public RandomPlusList LoadRando(string fileName)
+        {
+            XmlSerializer xml = new XmlSerializer(typeof(RandomPlusList));
+            using (StreamReader sr = new StreamReader(fileName))
+            {
+                return (RandomPlusList)xml.Deserialize(sr);
+            }
+        }
+        public void SaveRando(RandomPlusList config, string fileName)
+        {
+            XmlSerializer xml = new XmlSerializer(typeof(RandomPlusList));
+            using (StreamWriter sw = new StreamWriter(fileName))
+            {
+                xml.Serialize(sw, config);
+            }
+        }
+        public int FindRandom(int iList, int iMin, int iMax)
+        {
+            GetLogging("FindRandom, iList == " + iList);
 
-            bAlt = BeOnOff[iBee];
-            BeOnOff[iBee] = !BeOnOff[iBee];
+            int iBe = 0;
+            RandomPlusList XSets = new RandomPlusList();
 
-            bAlt = !bAlt;
-            return bAlt;
+            if (File.Exists(sRandFile))
+            {
+                XSets = LoadRando(sRandFile);
+
+                if (XSets.BigRanList.Count() < iList + 1)
+                {
+                    for (int i = XSets.BigRanList.Count() - 1; i < iList + 1; i++)
+                    {
+                        RandomPlus iBlank = new RandomPlus();
+                        XSets.BigRanList.Add(iBlank);
+                    }
+                }
+
+                for (int i = 0; i < XSets.BigRanList[iList].RandNums.Count; i++)
+                {
+                    if (XSets.BigRanList[iList].RandNums[i] > iMax || XSets.BigRanList[iList].RandNums[i] < iMin)
+                        XSets.BigRanList[iList].RandNums.RemoveAt(i);
+                }
+
+                if (XSets.BigRanList[iList].RandNums.Count == 0)
+                {
+                    for (int i = iMin; i < iMax + 1; i++)
+                        XSets.BigRanList[iList].RandNums.Add(i);
+                }
+
+                int iRanNum = RandInt(0, XSets.BigRanList[iList].RandNums.Count - 1);
+                iBe = XSets.BigRanList[iList].RandNums[iRanNum];
+                XSets.BigRanList[iList].RandNums.RemoveAt(iRanNum);
+            }
+            else
+            {
+                for (int i = 0; i < iList + 1; i++)
+                {
+                    RandomPlus iBlank = new RandomPlus();
+                    XSets.BigRanList.Add(iBlank);
+                }
+
+                for (int i = iMin; i < iMax + 1; i++)
+                    XSets.BigRanList[iList].RandNums.Add(i);
+
+                int iRanNum = RandInt(0, XSets.BigRanList[iList].RandNums.Count - 1);
+                iBe = XSets.BigRanList[iList].RandNums[iRanNum];
+                XSets.BigRanList[iList].RandNums.RemoveAt(iRanNum);
+            }
+            SaveRando(XSets, sRandFile);
+
+            return iBe;
         }
         public string SillyNameList()
         {
@@ -217,97 +445,98 @@ namespace OnlinePlayerz
 
             string MySilly = "";
 
-            List<string> sSillyNames = new List<string>();
+            List<string> sSillyNames = new List<string>
+            {
+                "0",              //0
+                "1",              //1
+                "2",              //2
+                "3",              //3
+                "4",              //4
+                "5",              //5
+                "6",              //6
+                "7",              //7
+                "8",              //8
+                "9",              //9
+                "ay",             //10
+                "ee",             //11
+                "igh",            //12
+                "ow",             //13
+                "oo",             //14
+                "or",             //15
+                "air",            //16
+                "ir",             //17
+                "ou",             //18
+                "oy",             //19
+                "ai",             //20
+                "ea",             //21
+                "ie",             //22
+                "ew",             //23
+                "ur",             //24
+                "ow",             //25
+                "oi",             //26
+                "ire",            //27
+                "ear",            //28
+                "ure",            //29
+                "tion",           //30
+                "ey",             //31
+                "ore",            //32
+                "ere",            //33
+                "oor",            //34
+                "X",              //35
+                "-",              //36
+                "^",              //37
+                "*",              //38
+                "#",              //39
+                "$",              //40
+                "TyHrd",          //41
+                "Luzz",           //42
+                "Killz",          //43
+                "| | |",          //44
+                "{[]}",           //45
+                "A",              //46
+                "B",              //47
+                "C",              ///48
+                "D",              ///49
+                "E",              ///50
+                "F",              ///51
+                "G",              ///52
+                "H",              ///53
+                "I",              ///54
+                "J",              ///55
+                "K",              ///56
+                "L",              ///57
+                "M",              ///58
+                "N",              ///59
+                "O",              ///60
+                "P"               ///61
+            };
 
-            sSillyNames.Add("0");              //0
-            sSillyNames.Add("1");              //1
-            sSillyNames.Add("2");              //2
-            sSillyNames.Add("3");              //3
-            sSillyNames.Add("4");              //4
-            sSillyNames.Add("5");              //5
-            sSillyNames.Add("6");              //6
-            sSillyNames.Add("7");              //7
-            sSillyNames.Add("8");              //8
-            sSillyNames.Add("9");              //9
-            sSillyNames.Add("ay");             //10
-            sSillyNames.Add("ee");             //11
-            sSillyNames.Add("igh");            //12
-            sSillyNames.Add("ow");             //13
-            sSillyNames.Add("oo");             //14
-            sSillyNames.Add("or");             //15
-            sSillyNames.Add("air");            //16
-            sSillyNames.Add("ir");             //17
-            sSillyNames.Add("ou");             //18
-            sSillyNames.Add("oy");             //19
-            sSillyNames.Add("ai");             //20
-            sSillyNames.Add("ea");             //21
-            sSillyNames.Add("ie");             //22
-            sSillyNames.Add("ew");             //23
-            sSillyNames.Add("ur");             //24
-            sSillyNames.Add("ow");             //25
-            sSillyNames.Add("oi");             //26
-            sSillyNames.Add("ire");            //27
-            sSillyNames.Add("ear");            //28
-            sSillyNames.Add("ure");            //29
-            sSillyNames.Add("tion");           //30
-            sSillyNames.Add("ey");             //31
-            sSillyNames.Add("ore");            //32
-            sSillyNames.Add("ere");            //33
-            sSillyNames.Add("oor");            //34
-            sSillyNames.Add("X");              //35
-            sSillyNames.Add("-");              //36
-            sSillyNames.Add("^");              //37
-            sSillyNames.Add("*");              //38
-            sSillyNames.Add("#");              //39
-            sSillyNames.Add("$");              //40
-            sSillyNames.Add("TyHrd");          //41
-            sSillyNames.Add("Luzz");           //42
-            sSillyNames.Add("Killz");          //43
-            sSillyNames.Add("| | |");          //44
-            sSillyNames.Add("{[]}");           //45
-            sSillyNames.Add("A");              //46
-            sSillyNames.Add("B");              //47
-            sSillyNames.Add("C");              ///48
-            sSillyNames.Add("D");              ///49
-            sSillyNames.Add("E");              ///50
-            sSillyNames.Add("F");              ///51
-            sSillyNames.Add("G");              ///52
-            sSillyNames.Add("H");              ///53
-            sSillyNames.Add("I");              ///54
-            sSillyNames.Add("J");              ///55
-            sSillyNames.Add("K");              ///56
-            sSillyNames.Add("L");              ///57
-            sSillyNames.Add("M");              ///58
-            sSillyNames.Add("N");              ///59
-            sSillyNames.Add("O");              ///60
-            sSillyNames.Add("P");              ///61
-
-            int iName = LessRandomz(2, 3, 1);
+            int iName = FindRandom(3, 2, 3);
 
             for (int i = 0; i < iName; i++)
-                MySilly = MySilly + sSillyNames[LessRandomz(10, 34, 2)];
+                MySilly = MySilly + sSillyNames[FindRandom(4, 10, 34)];
 
             MySilly.Remove(0, 1);
-            MySilly = sSillyNames[LessRandomz(46, 61, 3)] + MySilly;
+            MySilly = sSillyNames[FindRandom(5, 46, 61)] + MySilly;
 
             if (MySilly.Length < 8)
             {
-                if (LessRandomz(0, 20, 4) < 15)
+                if (FindRandom(7, 0, 20) < 15)
                 {
-                    iName = LessRandomz(1, 4, 5);
+                    iName = FindRandom(8, 1, 4);
                     for (int i = 0; i < iName; i++)
-                        MySilly = MySilly + sSillyNames[LessRandomz(0, 9, 6)];
+                        MySilly = MySilly + sSillyNames[FindRandom(9, 0, 9)];
                 }
                 else
                 {
-                    string sPrefix1 = sSillyNames[LessRandomz(35, 40, 7)];
-                    string sPrefix2 = sSillyNames[LessRandomz(35, 40, 8)];
+                    string sPrefix1 = sSillyNames[FindRandom(10, 35, 40)];
+                    string sPrefix2 = sSillyNames[FindRandom(11, 35, 40)];
 
                     MySilly = sPrefix1 + sPrefix2 + MySilly + sPrefix2 + sPrefix1;
                 }
             }
             else if (MySilly.Length < 4)
-                MySilly = MySilly + sSillyNames[LessRandomz(41, 45, 9)];
+                MySilly = MySilly + sSillyNames[FindRandom(6, 41, 45)];
 
             return MySilly;
         }
@@ -318,7 +547,7 @@ namespace OnlinePlayerz
             List<int> iKeepItReal = new List<int>();
 
             for (int i = 0; i < AFKList.Count(); i++)
-                iKeepItReal.Add(AFKList[i].iApp);
+                iKeepItReal.Add(AFKList[i].App);
 
             int iMit = RandInt(0, AFKPlayers.Count - 1);
 
@@ -328,17 +557,17 @@ namespace OnlinePlayerz
             string sName = SillyNameList();
             Blip FakeB = LocalBlip(AFKPlayers[iMit], 417, sName);
 
-            AfkPlayer MyAfk = new AfkPlayer();
-            MyAfk.ThisBlip = FakeB;
-            MyAfk.iApp = iMit;
-            MyAfk.iLevel = LessRandomz(1, 400, 10);
-            MyAfk.iTimeOn = Game.GameTime + RandInt(iMinSession, iMaxSession);
-            MyAfk.sMyName = sName;
+            AfkPlayer MyAfk = new AfkPlayer
+            {
+                ThisBlip = FakeB,
+                App = iMit,
+                Level = FindRandom(12, 1, 400),
+                TimeOn = Game.GameTime + RandInt(iMinSession, iMaxSession),
+                MyName = sName
+            };
             AFKList.Add(MyAfk);
 
             BackItUpBrain();
-
-            iCurrentPlayerz += 1;
         }
         private void BuildList()
         {
@@ -487,10 +716,9 @@ namespace OnlinePlayerz
             GetLogging("PedCleaning, iPed == " + iPed);
 
             int iBe = ReteaveBrain(iPed);
-            UI.Notify("~h~" + PedList[iBe].sMyName + "~s~ " + sOff);
+            UI.Notify("~h~" + PedList[iBe].MyName + "~s~ " + sOff);
 
             DeListingBrains(true, iPed, bGone);
-            bSearching = true;
             iCurrentPlayerz -= 1;
         }
         private void DeListingBrains(bool bPed, int iPos, bool bGone)
@@ -503,7 +731,6 @@ namespace OnlinePlayerz
 
                 if (PedList[iPos].ThisPed == null)
                 {
-                    bSearching = false;
                     if (PedList[iPos].ThisBlip != null)
                         PedList[iPos].ThisBlip.Remove();
 
@@ -517,116 +744,92 @@ namespace OnlinePlayerz
                 }
                 else
                 { 
-                    if (PedList[iPos].bHacker)
+                    if (PedList[iPos].Hacker)
                     {
                         for (int i = 0; i < Plops.Count; i++)
                             Plops[i].MarkAsNoLongerNeeded();
 
                         for (int i = 0; i < Vicks.Count; i++)
                             Vicks[i].MarkAsNoLongerNeeded();
-
+                        Plops.Clear();
+                        Vicks.Clear();
                         PedList[iPos].ThisPed.Detach();
                         bHackerIn = false;
                         bPiggyBack = false;
                         FireOrb(-1, PedList[iPos].ThisPed);
                     }
 
-                    if (PedList[iPos].bFollower)
+                    if (PedList[iPos].Follower)
                         iFollow -= 1;
+
                     if (PedList[iPos].ThisBlip != null)
                         PedList[iPos].ThisBlip.Remove();
 
                     if (PedList[iPos].DirBlip != null)
                         PedList[iPos].DirBlip.Remove();
 
-                    if (PedList[iPos].ThisVeh != null)
+                    if (PedList[iPos].ThisOppress != null)
+                    {
+                        EmptyVeh(PedList[iPos].ThisOppress);
+                        PedList[iPos].ThisOppress.Explode();
+                        PedList[iPos].ThisOppress.MarkAsNoLongerNeeded();
+                        PedList[iPos].ThisOppress = null;
+
+                        if (PedList[iPos].ThisVeh != null)
+                        {
+                            EmptyVeh(PedList[iPos].ThisVeh);
+                            PedList[iPos].ThisVeh.Delete();
+                            PedList[iPos].ThisVeh = null;
+                        }
+                    }
+                    else if (PedList[iPos].ThisVeh != null)
+                    {
+                        EmptyVeh(PedList[iPos].ThisVeh);
                         PedList[iPos].ThisVeh.MarkAsNoLongerNeeded();
+                        PedList[iPos].ThisVeh = null;
+                    }
 
                     if (bGone)
                         PedList[iPos].ThisPed.Delete();
                     else
                         PedList[iPos].ThisPed.MarkAsNoLongerNeeded();
-
+                    Function.Call(Hash.REMOVE_PED_FROM_GROUP, PedList[iPos].ThisPed.Handle);
                     PedList.RemoveAt(iPos);
                 }
             }
             else
             {
                 AFKList[iPos].ThisBlip.Remove();
-                UI.Notify("~h~" + AFKList[iPos].sMyName + "~s~ left");
+                UI.Notify("~h~" + AFKList[iPos].MyName + "~s~ left");
                 AFKList.RemoveAt(iPos);
             }
 
             BackItUpBrain();
         }
-        public int LessRandomz(int iMin, int iMax, int iList)
-        {
-            while (iRandList.Count() < iList + 1)
-            {
-                ImNotRandom iBe = new ImNotRandom();
-                iBe.iRando.Add(-1);
-                iRandList.Add(iBe);
-            }
-
-            if (iRandList[iList].iRando.Count() == 0)
-            {
-                iRandList[iList].iRando.Clear();
-                for (int i = iMin; i < iMax + 1; i++)
-                    iRandList[iList].iRando.Add(i);
-            }
-            else if (iRandList[iList].iRando[0] == -1)
-            {
-                iRandList[iList].iRando.Clear();
-                for (int i = iMin; i < iMax + 1; i++)
-                    iRandList[iList].iRando.Add(i);
-            }
-
-            int iRando = 0;
-            int iRemove = RandInt(0, iRandList[iList].iRando.Count() - 1);
-            iRando = iRandList[iList].iRando[iRemove];
-            iRandList[iList].iRando.RemoveAt(iRemove);
-
-            return iRando;
-        }
-        public class ImNotRandom
-        {
-            public List<int> iRando { get; set; }
-
-            public ImNotRandom()
-            {
-                iRando = new List<int>();
-            }
-        }
         private void NewPlayer()
         {
             GetLogging("NewPlayer, iCurrentPlayerz == " + iCurrentPlayerz);
             SetBTimer(RandInt(iMinWait, iMaxWait), 1);
-            LoadSettings();
+            LoadIniSetts();
+            int iHeister = NearHiest();
 
-            if (iCurrentPlayerz < iMaxPlayers)
+            if (iCurrentPlayerz + 5 < iMaxPlayers && iHeister != -1 && bHeistPop)
+                HeistDrips(iHeister);
+            else if (iCurrentPlayerz < iMaxPlayers)
             {
-                if (BOnBOff(0))
+                if (FindRandom(0, 1, 10) < 6)
                 {
-                    bStuckOnYou = true;
-                    if (BOnBOff(3))
-                        FindAPed(Game.Player.Character.Position, 95.00f, true, -1);
+                    if (FindRandom(1, 1, 10) < 6)
+                        SearchPed(35.00f, 220.00f, null, 0, -1);
                     else
                     {
-                        int iTypeO = LessRandomz(1, 9, 12);
-                        FindNearestVeh(Game.Player.Character.Position, RandVeh(iTypeO), true);
-                    }
-
-                    if (iCurrentPlayerz + 5 < iMaxPlayers)
-                    {
-                        if (bHeistPop)
-                            NearHiest(true);
-                        else
-                            CeoBikersGreaf();
+                        int iTypeO = FindRandom(2, 1, 9);
+                        SearchVeh(15.00f, 145.00f, RandVeh(iTypeO), true, -1);
                     }
                 }
                 else
                     InABuilding();
-        
+                iCurrentPlayerz += 1;
             }
         }
         public int RandInt(int iMin, int iMax)
@@ -670,7 +873,7 @@ namespace OnlinePlayerz
         {
             Vehicle Vickary = null;
 
-            if (World.GetNextPositionOnStreet(Game.Player.Character.Position).DistanceTo(Game.Player.Character.Position) < 95.00f)
+            if (World.GetNextPositionOnStreet(YoPoza()).DistanceTo(YoPoza()) < 95.00f)
             {
                 Vehicle[] CarSpot = World.GetNearbyVehicles(Vec3, 200.00f);
                 for (int i = 0; i < CarSpot.Count(); i++)
@@ -678,7 +881,7 @@ namespace OnlinePlayerz
                     if (VehExists(CarSpot, i) && Vickary == null)
                     {
                         Vehicle Veh = CarSpot[i];
-                        if (!Veh.IsPersistent && Veh.Position.DistanceTo(Game.Player.Character.Position) > 15.00f && Veh.ClassType != VehicleClass.Boats && Veh.ClassType != VehicleClass.Cycles && Veh.ClassType != VehicleClass.Helicopters && Veh.ClassType != VehicleClass.Planes && Veh.ClassType != VehicleClass.Trains && !Veh.IsOnScreen)
+                        if (!Veh.IsPersistent && Veh.Position.DistanceTo(YoPoza()) > 15.00f && Veh.ClassType != VehicleClass.Boats && Veh.ClassType != VehicleClass.Cycles && Veh.ClassType != VehicleClass.Helicopters && Veh.ClassType != VehicleClass.Planes && Veh.ClassType != VehicleClass.Trains && !Veh.IsOnScreen)
                         {
                             if (!Veh.IsSeatFree(VehicleSeat.Driver) || Veh.EngineRunning)
                                 Vickary = Veh;
@@ -688,32 +891,6 @@ namespace OnlinePlayerz
                 }
             }
             return Vickary;
-        }
-        public Vehicle FindNearestVeh(Vector3 Vec3, string sModel, bool bAddPlayer)
-        {
-            GetLogging("FindNearestVeh, sModel == " + sModel);
-
-            Vehicle VickPos = LookNear(Vec3);
-
-            while (VickPos == null && bSearching)
-            {
-                PlayerZerosAI();
-
-                Script.Wait(100);
-                VickPos = LookNear(Game.Player.Character.Position);
-            }
-            bStuckOnYou = false;
-            if (bSearching)
-            {
-                Vector3 PedPos = VickPos.Position;
-                float PedRot = VickPos.Heading;
-                VickPos.Delete();
-                VickPos = VehicleSpawn(sModel, PedPos, PedRot, bAddPlayer, true);
-            }
-            else
-                VickPos = null;
-
-            return VickPos;
         }
         public bool VehExists(Vehicle[] Vehlist, int iPos)
         {
@@ -796,8 +973,11 @@ namespace OnlinePlayerz
                     sVehicles.Add("THRAX");
                     sVehicles.Add("ZORRUSSO");
                     sVehicles.Add("TIGON");
+                    sVehicles.Add("champion"); //Dewbauchee Champion
+                    sVehicles.Add("ignus"); //Pegassi Ignus
+                    sVehicles.Add("zeno"); //Overflod Zeno
                 }
-            }       //Super
+            }            //Super
             else if (iVechList == 2)
             {
                 sVehicles.Add("COGCABRIO"); //
@@ -900,6 +1080,7 @@ namespace OnlinePlayerz
                     sVehicles.Add("SULTAN3"); //
                     sVehicles.Add("VECTRE"); //
                     sVehicles.Add("ZR350"); //
+                    sVehicles.Add("comet7"); //Pfister Comet S2 Cabrio
                 }
             }       //Sport
             else if (iVechList == 4)
@@ -952,6 +1133,7 @@ namespace OnlinePlayerz
                     sVehicles.Add("YOSEMITE3"); //
                     sVehicles.Add("DOMINATOR7"); //
                     sVehicles.Add("DOMINATOR8"); //
+                    sVehicles.Add("buffalo4"); //Bravado Buffalo STX
                 }
             }       //Mussle
             else if (iVechList == 5)
@@ -1029,6 +1211,8 @@ namespace OnlinePlayerz
                 {
                     sVehicles.Add("TAILGATER2"); //
                     sVehicles.Add("WARRENER2"); //
+                    sVehicles.Add("cinquemila"); //Lampadati Cinquemila
+                    sVehicles.Add("deity"); //Enus Deity
                 }
             }       //Sedan
             else if (iVechList == 8)
@@ -1052,7 +1236,8 @@ namespace OnlinePlayerz
                     sVehicles.Add("VAGRANT"); //
                     sVehicles.Add("ZHABA"); //
                     sVehicles.Add("WINKY"); //><!-- Vapid Winky -->	
-                    sVehicles.Add("SQUADDIE"); 
+                    sVehicles.Add("SQUADDIE");
+                    sVehicles.Add("patriot3"); //Mammoth Patriot Mil-Spec
                 }
             }       //Offroad
             else if (iVechList == 9)
@@ -1091,6 +1276,8 @@ namespace OnlinePlayerz
                 if (bTrainM)
                 {
                     sVehicles.Add("MANCHEZ2"); //><!-- Maibatsu Manchez Scout -->
+                    sVehicles.Add("reever"); //Western Reever
+                    sVehicles.Add("shinobi"); //Nagasaki Shinobi
                 }
             }       //Motorcycle
             else if (iVechList == 10)
@@ -1213,7 +1400,7 @@ namespace OnlinePlayerz
 
             return sVehicles[RandInt(0, sVehicles.Count - 1)];
         }
-        public Vehicle VehicleSpawn(string sVehModel, Vector3 VecLocal, float VecHead, bool bAddPlayer, bool bRandomFeat)
+        public Vehicle VehicleSpawn(string sVehModel, Vector3 VecLocal, float VecHead, bool bAddPlayer, int iAddtoBrain, bool bAirVeh)
         {
             GetLogging("VehicleSpawn, sVehModel == " + sVehModel + ", bAddPlayer == " + bAddPlayer);
 
@@ -1237,13 +1424,33 @@ namespace OnlinePlayerz
                 if (bAddPlayer)
                 {
                     GenPlayerPed(BuildVehicle.Position, BuildVehicle.Heading, BuildVehicle, -1, -1);
-                    
+
                     if (iCurrentPlayerz + 7 < iMaxPlayers && RandInt(0, 20) < 5)
                     {
                         for (int i = 0; i < BuildVehicle.PassengerSeats - 1; i++)
                             GenPlayerPed(BuildVehicle.Position, BuildVehicle.Heading, BuildVehicle, i, -1);
                     }
                 }
+                else
+                {
+                    int ThisBrain = ReteaveBrain(iAddtoBrain);
+                    PedList[ThisBrain].ThisVeh = BuildVehicle;
+                    WarptoAnyVeh(BuildVehicle, PedList[ThisBrain].ThisPed, -1);
+                    PedList[ThisBrain].EnterVehQue = false;
+                    if (bAirVeh)
+                        PedList[ThisBrain].Pilot = true;
+                    else
+                        PedList[ThisBrain].Driver = true;
+                    if (PedList[ThisBrain].ThisBlip != null)
+                        ClearPedBlips(iAddtoBrain);
+
+                    PedList[ThisBrain].ThisBlip = PedBlimp(PedList[ThisBrain].ThisPed, OhMyBlip(BuildVehicle), PedList[ThisBrain].MyName, PedList[ThisBrain].Colours);
+                    DriveTooo(PedList[ThisBrain].ThisPed, false);
+                }
+                if (bAirVeh)
+                    MaxOutAllModsNoWheels(BuildVehicle);
+                else
+                    MaxModsRandExtras(BuildVehicle);
 
                 Function.Call(Hash.SET_MODEL_AS_NO_LONGER_NEEDED, iVehHash);
             }
@@ -1252,47 +1459,70 @@ namespace OnlinePlayerz
 
             return BuildVehicle;
         }
-        public Vector3 FindAPed(Vector3 vZone, float fRadius, bool bReplace, int iReload)
+        private void MaxModsRandExtras(Vehicle Vehic)
         {
-            GetLogging("FindAPed, iReload == " + iReload);
+            GetLogging("MaxModsRandExtras");
 
-            Ped VPedPos = DoStopTillDrop(vZone, fRadius);
-            Vector3 PedPos = Vector3.Zero;
-            while (VPedPos == null && bSearching)
-            {
-                PlayerZerosAI();
-                Script.Wait(100);
-                VPedPos = DoStopTillDrop(Game.Player.Character.Position, 150.00f);
-            }
-            bStuckOnYou = false;
-            if (bSearching)
-            {
-                PedPos = VPedPos.Position;
-                float PedRot = VPedPos.Heading;
-                VPedPos.Delete();
-                if (bReplace)
-                    GenPlayerPed(PedPos, PedRot, null, 0, iReload);
-            }
+            bool bMotoBike = Vehic.ClassType == VehicleClass.Motorcycles;
 
-            return PedPos;
-        }
-        public Ped DoStopTillDrop(Vector3 vZone, float fRadius)
-        {
-            Ped RandPed = null;
-            Ped[] MadPeds = World.GetNearbyPeds(vZone, fRadius);
-
-            for (int i = 0; i < MadPeds.Count(); i++)
+            for (int i = 0; i < 50; i++)
             {
-                if (PedExists(MadPeds, i) && RandPed == null)
+                int iSpoilher = Function.Call<int>(Hash.GET_NUM_VEHICLE_MODS, Vehic.Handle, i);
+
+                if (i == 11 || i == 12 || i == 13 || i == 15 || i == 16)
                 {
-                    if (!MadPeds[i].IsOnScreen && !MadPeds[i].IsInVehicle() && Function.Call<int>(Hash.GET_PED_TYPE, MadPeds[i]) != 28 && MadPeds[i] != Game.Player.Character && !MadPeds[i].IsPersistent)
-                    {
-                        RandPed = MadPeds[i];
-                        break;
-                    }
+                    iSpoilher -= 1;
+                    Function.Call(Hash.SET_VEHICLE_MOD, Vehic.Handle, i, iSpoilher, true);
+                }
+                else if (i == 18 || i == 22)
+                    iSpoilher = -1;
+
+                else if (i == 24)
+                {
+                    iSpoilher = Function.Call<int>(Hash.GET_VEHICLE_MOD, Vehic.Handle, 23);
+                    if (bMotoBike)
+                        Function.Call(Hash.SET_VEHICLE_MOD, Vehic.Handle, i, iSpoilher, true);
+
+                }
+                else
+                {
+                    if (iSpoilher != 0)
+                        iSpoilher = RandInt(0, iSpoilher - 1);
+
+                    Function.Call(Hash.SET_VEHICLE_MOD, Vehic.Handle, i, RandInt(0, iSpoilher - 1), true);
                 }
             }
-            return RandPed;
+            if (Vehic.ClassType != VehicleClass.Cycles || Vehic.ClassType != VehicleClass.Helicopters || Vehic.ClassType != VehicleClass.Boats || Vehic.ClassType != VehicleClass.Planes)
+            {
+                Vehic.ToggleMod(VehicleToggleMod.XenonHeadlights, true);
+                Vehic.ToggleMod(VehicleToggleMod.Turbo, true);
+            }
+        }
+        private void MaxOutAllModsNoWheels(Vehicle Vehic)
+        {
+            GetLogging("MaxOutAllModsNoWheels");
+
+            Function.Call(Hash.SET_VEHICLE_MOD_KIT, Vehic.Handle, 0);
+            for (int i = 0; i < 50; i++)
+            {
+                int iSpoilher = Function.Call<int>(Hash.GET_NUM_VEHICLE_MODS, Vehic.Handle, i);
+
+                if (i == 18 || i == 22 || i == 23 || i == 24)
+                {
+
+                }
+                else
+                {
+                    iSpoilher -= 1;
+                    Function.Call(Hash.SET_VEHICLE_MOD, Vehic.Handle, i, iSpoilher, true);
+                }
+            }
+            if (Vehic.ClassType != VehicleClass.Cycles || Vehic.ClassType != VehicleClass.Helicopters || Vehic.ClassType != VehicleClass.Boats || Vehic.ClassType != VehicleClass.Planes)
+            {
+                Vehic.ToggleMod(VehicleToggleMod.XenonHeadlights, true);
+                Vehic.ToggleMod(VehicleToggleMod.Turbo, true);
+            }
+            Function.Call(Hash._SET_VEHICLE_LANDING_GEAR, Vehic.Handle, 3);
         }
         public bool PedExists(Ped[] Peddylist, int iPos)
         {
@@ -1315,11 +1545,12 @@ namespace OnlinePlayerz
 
             Ped MyPed = null;
             bool bMale = false;
+            int iOldPed = ReteaveBrain(iReload);
             string sPeddy = "mp_f_freemode_01";
 
-            if (iReload == -1)
+            if (iOldPed == -1)
             {
-                if (BOnBOff(1))
+                if (FindRandom(13, 0, 20) < 10)
                 {
                     bMale = true;
                     sPeddy = "mp_m_freemode_01";
@@ -1327,14 +1558,12 @@ namespace OnlinePlayerz
             }
             else
             {
-                iReload = ReteaveBrain(iReload);
-                if (PedList[iReload].PFMySetting.PFMale)
+                if (PedList[iOldPed].PFMySetting.PFMale)
                 {
                     bMale = true;
                     sPeddy = "mp_m_freemode_01";
                 }
             }
-
 
             var model = new Model(sPeddy);
             model.Request();    // Check if the model is valid
@@ -1349,19 +1578,14 @@ namespace OnlinePlayerz
                 if (MyPed.Exists())
                 {
                     int iAccuracy = RandInt(iAccMin, iAccMax);
-                    Function.Call(Hash.SET_PED_ACCURACY, MyPed, iAccuracy);
+                    Function.Call(Hash.SET_PED_ACCURACY, MyPed.Handle, iAccuracy);
                     MyPed.MaxHealth = RandInt(200, 400);
                     MyPed.Health = MyPed.MaxHealth;
 
-                    if (iReload == -1)
-                    {
-                        PedFixtures MyFixtures = new PedFixtures();
-                        MyFixtures.PFMale = bMale;
-
-                        OnlineFaceTypes(MyPed, bMale, vMyCar, iSeat, MyFixtures, iReload);
-                    }
+                    if (iOldPed == -1)
+                        OnlineFaceTypes(MyPed, bMale, vMyCar, iSeat, null, -1);
                     else
-                        OnlineFaceTypes(MyPed, bMale, vMyCar, iSeat, null, PedList[iReload].iLevel);
+                        OnlineFaceTypes(MyPed, bMale, vMyCar, iSeat, PedList[iOldPed].PFMySetting, iReload);
                 }
                 else
                     MyPed = null;
@@ -1375,72 +1599,7 @@ namespace OnlinePlayerz
         {
             GetLogging("WarptoAnyVeh, iSeat == " + iSeat);
 
-            Function.Call(Hash.SET_PED_INTO_VEHICLE, Peddy, Vhic, iSeat);
-        }
-        private void EnterAnyVeh(Vehicle Vhic, Ped Peddy, float Run, int iBPed)
-        {
-            GetLogging("EnterAnyVeh, iBPed == " + iBPed);
-
-            bool bFound = false;
-            Peddy.BlockPermanentEvents = true;
-            if (Vhic.Exists())
-            {
-                int iSeats = 0;
-                while (!bFound && iSeats < Function.Call<int>(Hash.GET_VEHICLE_MAX_NUMBER_OF_PASSENGERS, Vhic.Handle))
-                {
-                    if (Function.Call<bool>(Hash.IS_VEHICLE_SEAT_FREE, Vhic.Handle, iSeats))
-                    {
-                        bFound = true;
-                        break;
-                    }
-                    else
-                        iSeats += 1;
-                }
-                if (bFound)
-                {
-                    if (Peddy.Position.DistanceTo(Vhic.Position) < 65.00f)
-                    {
-                        while (!Peddy.IsInVehicle(Vhic) && !Peddy.IsDead && !Peddy.IsFalling && bSearching)
-                        {
-                            if (Peddy.Position.DistanceTo(Vhic.Position) > 65.00f || Game.Player.Character.Position.DistanceTo(Peddy.Position) > 65.00f)
-                                WarptoAnyVeh(Vhic, Peddy, iSeats);
-                            else if (!Function.Call<bool>(Hash.IS_PED_GETTING_INTO_A_VEHICLE, Peddy))
-                                Function.Call(Hash.TASK_ENTER_VEHICLE, Peddy, Vhic, -1, iSeats, Run, 1, 0);
-
-                            Script.Wait(100);
-                        }
-                    }
-                    else
-                        WarptoAnyVeh(Vhic, Peddy, iSeats);
-                }
-                else
-                {
-                    if (iBPed != -1)
-                    {
-                        iBPed = ReteaveBrain(iBPed);
-                        if (PedList[iBPed].ThisVeh != null)
-                            PedList[iBPed].ThisVeh.MarkAsNoLongerNeeded();
-
-                        if (!bStuckOnYou)
-                        {
-                            PedList[iBPed].ThisVeh = FindNearestVeh(Game.Player.Character.Position, RandVeh(RandInt(1, 9)), false);
-                            while (!Peddy.IsInVehicle() && !Peddy.IsDead && !Peddy.IsFalling && PedList[iBPed].ThisVeh != null && Game.Player.Character.IsInVehicle() && bSearching)
-                            {
-                                if (Peddy.Position.DistanceTo(Vhic.Position) > 65.00f || Game.Player.Character.Position.DistanceTo(Peddy.Position) > 65.00f)
-                                    WarptoAnyVeh(PedList[iBPed].ThisVeh, Peddy, -1);
-                                else if (!Function.Call<bool>(Hash.IS_PED_GETTING_INTO_A_VEHICLE, Peddy))
-                                    Function.Call(Hash.TASK_ENTER_VEHICLE, Peddy, PedList[iBPed].ThisVeh, -1, -1, Run, 1, 0);
-
-                                Script.Wait(100);
-                            }
-                            if (bSearching)
-                                PedList[iBPed].bDriver = true;
-                        }
-                    }
-                }
-            }
-            if (bSearching)
-                Peddy.BlockPermanentEvents = false;
+            Function.Call(Hash.SET_PED_INTO_VEHICLE, Peddy.Handle, Vhic.Handle, iSeat);
         }
         private void GetOutVehicle(Ped Peddy, int iPed)
         {
@@ -1449,15 +1608,41 @@ namespace OnlinePlayerz
             if (Peddy.IsInVehicle())
             {
                 Vehicle PedVeh = Peddy.CurrentVehicle;
-                Function.Call(Hash.TASK_LEAVE_VEHICLE, Peddy, PedVeh, 4160);
+                Function.Call(Hash.TASK_LEAVE_VEHICLE, Peddy.Handle, PedVeh.Handle, 4160);
             }
             if (iPed != -1)
             {
                 iPed = ReteaveBrain(iPed);
-                ClearPedBlips(PedList[iPed].iLevel);
+                ClearPedBlips(PedList[iPed].Level);
                 PedList[iPed].DirBlip = DirectionalBlimp(PedList[iPed].ThisPed);
-                PedList[iPed].ThisBlip = PedBlimp(PedList[iPed].ThisPed, 1, PedList[iPed].sMyName, PedList[iPed].iColours);
+                PedList[iPed].ThisBlip = PedBlimp(PedList[iPed].ThisPed, 1, PedList[iPed].MyName, PedList[iPed].Colours);
             }
+        }
+        private void PlayerEnterVeh(Vehicle Vhick)
+        {
+            GetLogging("PlayerEnterVeh");
+
+            iFindingTime = Game.GameTime + 1000;
+            int iSeats = 0;
+
+            while (iSeats < Function.Call<int>(Hash.GET_VEHICLE_MAX_NUMBER_OF_PASSENGERS, Vhick.Handle))
+            {
+                if (Function.Call<bool>(Hash.IS_VEHICLE_SEAT_FREE, Vhick.Handle, iSeats))
+                    break;
+                else
+                    iSeats += 1;
+            }
+            int ThreePass = 3;
+            while (!Function.Call<bool>(Hash.IS_PED_GETTING_INTO_A_VEHICLE, Game.Player.Character.Handle) && ThreePass > 0)
+            {
+                Script.Wait(500);
+                Function.Call(Hash.TASK_ENTER_VEHICLE, Game.Player.Character.Handle, Vhick.Handle, -1, iSeats, 1.50f, 1, 0);
+                ThreePass -= 1;
+            }
+    
+            if (ThreePass < 1)
+                    WarptoAnyVeh(Vhick, Game.Player.Character, iSeats);
+
         }
         private void EmptyVeh(Vehicle Vhic)
         {
@@ -1478,21 +1663,63 @@ namespace OnlinePlayerz
         {
             GetLogging("FolllowTheLeader");
 
-            Peddy.RelationshipGroup = Game.Player.Character.RelationshipGroup;
-            Function.Call(Hash.SET_PED_AS_GROUP_MEMBER, Peddy.Handle, iPlayerGroups);
-            Function.Call(Hash.TASK_FOLLOW_TO_OFFSET_OF_ENTITY, Peddy.Handle, Game.Player.Character.Handle, 0.0f, 3.0f, 0.0f, 1.0f, -1, 0.5f, true);
-            Function.Call(Hash.SET_PED_CAN_TELEPORT_TO_GROUP_LEADER, Peddy.Handle, iFollowingNPCs, true);
+            Function.Call(Hash.SET_PED_AS_GROUP_MEMBER, Peddy.Handle, iFollowMe);
+            Peddy.RelationshipGroup = Gp_Follow;
             Function.Call(Hash.SET_PED_FLEE_ATTRIBUTES, Peddy.Handle, 0, true);
             Peddy.BlockPermanentEvents = false;
             Peddy.AlwaysKeepTask = true;
-            Peddy.CanBeTargetted = true;
-        }
-        private void ExMember(Ped Peddy)
-        {
-            GetLogging("ExMember");
 
-            if (Function.Call<bool>(Hash.IS_PED_GROUP_MEMBER, Peddy.Handle, iPlayerGroups))
-                Function.Call(Hash.REMOVE_PED_FROM_GROUP, Peddy.Handle);
+            if (iAggression > 5)
+                Function.Call(Hash.SET_PED_CAN_BE_TARGETTED_BY_PLAYER, Peddy.Handle, Game.Player.Character.Handle, true);
+            else
+                Function.Call(Hash.SET_PED_CAN_BE_TARGETTED_BY_PLAYER, Peddy.Handle, Game.Player.Character.Handle, false);
+        }
+        private void OhDoKeepUp(Ped Peddy)
+        {
+            Peddy.Task.ClearAll();
+
+            float fXpos = -2.50f;
+            float fYpos = 1.50f;
+
+            iFolPos += 1;
+            if (iFolPos == 1)
+            {
+                fXpos = -2.50f;
+                fYpos = 0.00f;
+            }
+            else if (iFolPos == 2)
+            {
+                fXpos = -2.50f;
+                fYpos = -2.50f;
+            }
+            else if (iFolPos == 3)
+            {
+                fXpos = 2.50f;
+                fYpos = 0.00f;
+            }
+            else if (iFolPos == 4)
+            {
+                fXpos = 1.50f;
+                fYpos = 0.00f;
+            }
+            else if (iFolPos == 5)
+            {
+                fXpos = -1.50f;
+                fYpos = 0.00f;
+            }
+            else if (iFolPos == 6)
+            {
+                fXpos = 2.50f;
+                fYpos = -2.50f;
+            }
+            else if (iFolPos == 7)
+            {
+                fXpos = -1.50f;
+                fYpos = -2.50f;
+                iFolPos = 0;
+            }
+
+            Function.Call(Hash.TASK_FOLLOW_TO_OFFSET_OF_ENTITY, Peddy.Handle, Game.Player.Character.Handle, fXpos, fYpos, 0.0f, 1.0f, -1, 2.5f, true);
         }
         private void DriveBye(Ped Peddy)
         {
@@ -1505,7 +1732,7 @@ namespace OnlinePlayerz
                     if (Game.Player.Character.IsInVehicle())
                         Peddy.Task.VehicleChase(Game.Player.Character);
                     else
-                        Peddy.Task.DriveTo(Peddy.CurrentVehicle, Game.Player.Character.Position, 10.00f, 45.00f, 0);
+                        Peddy.Task.DriveTo(Peddy.CurrentVehicle, YoPoza(), 10.00f, 45.00f, 0);
 
                     Function.Call(Hash.SET_DRIVER_ABILITY, Peddy.Handle, 1.00f);
                     Function.Call(Hash.SET_PED_STEERS_AROUND_VEHICLES, Peddy.Handle, true);
@@ -1540,9 +1767,9 @@ namespace OnlinePlayerz
                 {
 
                     if (bRunOver)
-                        Peddy.Task.DriveTo(Peddy.CurrentVehicle, Game.Player.Character.Position, 1.00f, 45.00f, 0);
+                        Peddy.Task.DriveTo(Peddy.CurrentVehicle, YoPoza(), 1.00f, 45.00f, 0);
                     else
-                        Peddy.Task.DriveTo(Peddy.CurrentVehicle, Game.Player.Character.Position, 10.00f, 25.00f, 0);
+                        Peddy.Task.DriveTo(Peddy.CurrentVehicle, YoPoza(), 10.00f, 25.00f, 0);
 
                     Function.Call(Hash.SET_DRIVER_ABILITY, Peddy.Handle, 1.00f);
                     Function.Call(Hash.SET_PED_STEERS_AROUND_VEHICLES, Peddy.Handle, true);
@@ -1567,10 +1794,11 @@ namespace OnlinePlayerz
         {
             GetLogging("FightPlayer");
 
+            Function.Call(Hash.REMOVE_PED_FROM_GROUP, Peddy.Handle);
+            Peddy.RelationshipGroup = GP_Attack;
             Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, Peddy.Handle);
             Peddy.IsEnemy = true;
             Peddy.CanBeTargette﻿d﻿ = true;
-            Peddy.RelationshipGroup = iAttackingNPCs;
             Function.Call(Hash.SET_PED_FLEE_ATTRIBUTES, Peddy.Handle, 0, true);
             Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 46, true);
             if (!bInVeh)
@@ -1582,43 +1810,70 @@ namespace OnlinePlayerz
         {
             GetLogging("AirAttack, iPed == " + iPed);
 
-            iPed = ReteaveBrain(iPed);
+            int iFinder = FindRandom(21, 1, 100);
 
-            Ped Peddy = PedList[iPed].ThisPed;
-            if (RandInt(0, 50) < 25)
-                HeliFighter(Peddy, iPed);
+            if (iFinder < 33)
+                HeliFighter(iPed);
+            else if (iFinder < 66)
+                LaserFighter(iPed);
             else
-                LaserFighter(Peddy, iPed);
+                OppresorFighter(iPed);
         }
-        private void HeliFighter(Ped Peddy,int iPed)
+        private void HeliFighter(int iPed)
         {
             GetLogging("HeliFighter, iPed == " + iPed);
 
-            ClearPedBlips(PedList[iPed].iLevel);
+            int MyPed = ReteaveBrain(iPed);
+            Ped Peddy = PedList[MyPed].ThisPed;
+            PedList[MyPed].AirAttack = 1;
             string sVeh = RandVeh(13);
-            Vehicle vHeli = VehicleSpawn(sVeh, new Vector3(Peddy.Position.X, Peddy.Position.Y, Peddy.Position.Z + 250.00f), 0.00f, false, false);
-            WarptoAnyVeh(vHeli, Peddy, -1);
-            PedList[iPed].ThisVeh = vHeli;
-            PedList[iPed].ThisBlip = PedBlimp(Peddy, 422, PedList[iPed].sMyName, PedList[iPed].iColours);
-            FlyAway(Peddy, Game.Player.Character.Position, 250.00f, 0.00f);
+            Vehicle vHeli = VehicleSpawn(sVeh, new Vector3(Peddy.Position.X, Peddy.Position.Y, Peddy.Position.Z + 250.00f), 0.00f, false, iPed, true);
+            FlyAway(PedList[MyPed].ThisPed, YoPoza(), 250.00f, 0.00f);
             Function.Call(Hash.SET_PED_FIRING_PATTERN, Peddy.Handle, Function.Call<int>(Hash.GET_HASH_KEY, "FIRING_PATTERN_BURST_FIRE_HELI"));
-            Peddy.AlwaysKeepTask = true;
-            Peddy.BlockPermanentEvents = true;
+            Peddy.RelationshipGroup = GP_Mental;
+            Peddy.BlockPermanentEvents = false;
         }
-        private void LaserFighter(Ped Peddy, int iPed)
+        private void LaserFighter(int iPed)
         {
             GetLogging("LaserFighter, iPed == " + iPed);
 
-            ClearPedBlips(PedList[iPed].iLevel);
+            int MyPed = ReteaveBrain(iPed);
+            Ped Peddy = PedList[MyPed].ThisPed;
+            PedList[MyPed].AirAttack = 2;
+            PedList[MyPed].AirDirect = (float)RandInt(0, 360);
             string sVeh = RandVeh(12);
-            Vehicle vPlane = VehicleSpawn(sVeh, new Vector3(Peddy.Position.X, Peddy.Position.Y, Peddy.Position.Z + 1550.00f), 0.00f, false, false);
-            WarptoAnyVeh(vPlane, Peddy, -1);
-            PedList[iPed].ThisVeh = vPlane;
-            PedList[iPed].ThisBlip = PedBlimp(Peddy, 424, PedList[iPed].sMyName, PedList[iPed].iColours);
-            Function.Call(Hash.TASK_PLANE_MISSION, Peddy, vPlane, 0, Game.Player.Character.Handle, 0, 0, 0, 6, 0.0f, 0.0f, 180.0f, 1000.0f, -5000.0f);
-            Function.Call(Hash.SET_PED_FLEE_ATTRIBUTES, Peddy, 0, true);
-            Peddy.AlwaysKeepTask = true;
-            Peddy.BlockPermanentEvents = true;
+            Vehicle vPlane = VehicleSpawn(sVeh, new Vector3(Peddy.Position.X, Peddy.Position.Y, Peddy.Position.Z + 1550.00f), 0.00f, false, iPed, true);
+            Function.Call(Hash.TASK_PLANE_MISSION, PedList[MyPed].ThisPed.Handle, PedList[MyPed].ThisVeh.Handle, 0, Game.Player.Character.Handle, 0, 0, 0, 6, 0.0f, 0.0f, PedList[MyPed].AirDirect, 1000.0f, -5000.0f);
+            Function.Call(Hash.SET_PED_FLEE_ATTRIBUTES, Peddy.Handle, 0, true);
+            Peddy.RelationshipGroup = GP_Mental;
+            Peddy.BlockPermanentEvents = false;
+        }
+        private void OppresorFighter(int iPed)
+        {
+            GetLogging("OppresorFighter, iPed == " + iPed);
+
+
+            int MyPed = ReteaveBrain(iPed);
+            Ped Peddy = PedList[MyPed].ThisPed;
+            PedList[MyPed].AirAttack = 3;
+            PedList[MyPed].AirDirect = (float)RandInt(0, 360);
+            Vehicle Planes = VehicleSpawn("hydra", new Vector3(Peddy.Position.X, Peddy.Position.Y, Peddy.Position.Z + 1550.00f), 0.00f, false, iPed, true);
+            ClearPedBlips(iPed);
+            PedList[MyPed].ThisBlip = PedBlimp(Peddy, 639, PedList[MyPed].MyName, PedList[MyPed].Colours);            
+            Function.Call(Hash.TASK_PLANE_MISSION, Peddy.Handle, Planes.Handle, 0, Game.Player.Character.Handle, 0, 0, 0, 6, 0.0f, 0.0f, PedList[MyPed].AirDirect, 300.0f, -5000.0f);
+            Function.Call(Hash.SET_PED_FLEE_ATTRIBUTES, Peddy.Handle, 0, true);
+            Peddy.RelationshipGroup = GP_Mental;
+            Peddy.BlockPermanentEvents = false;
+            
+            Vehicle Bike = World.CreateVehicle(VehicleHash.Oppressor2, Planes.Position);
+            Bike.IsPersistent = true;
+            PedList[MyPed].ThisOppress = Bike;
+            Function.Call(Hash.ATTACH_ENTITY_TO_ENTITY, Bike.Handle, Planes.Handle, Function.Call<int>(Hash.GET_PED_BONE_INDEX, Planes.Handle, 0), 0.00f, 3.32999945f, -0.10f, 0.00f, 0.00f, 0.00f, false, false, false, false, 2, true);
+
+            Planes.IsVisible = false;
+            Bike.IsVisible = true;
+            Peddy.IsVisible = true;
+            //VehAnim(Peddy, "veh@bike@sport@front@base", "sit");
         }
         private void FlyAway(Ped Pedd, Vector3 vHeliDest, float fSpeed, float flanding)
         {
@@ -1644,7 +1899,7 @@ namespace OnlinePlayerz
         {
             GetLogging("HackerTime");
 
-            if (Game.Player.Character.Position.DistanceTo(new Vector3(-778.81F, 312.66F, 84.70F)) < 80.00f)
+            if (YoPoza().DistanceTo(new Vector3(-778.81F, 312.66F, 84.70F)) < 80.00f)
             {
                 Prop Plop = World.CreateProp("prop_windmill_01", new Vector3(-832.50f, 290.95f, 82.00f), new Vector3(-90.00f, 94.72f, 0.00f), true, false);
                 Plops.Add(new Prop(Plop.Handle));
@@ -1658,7 +1913,7 @@ namespace OnlinePlayerz
                 Game.Player.Character.IsInvincible = true;
                 EmptyVeh(Game.Player.Character.CurrentVehicle);
                 Game.Player.Character.CurrentVehicle.Explode();
-                Script.Wait(4000);          
+                Script.Wait(4000);
                 Game.Player.Character.IsInvincible = false;
 
                 ForceAnim(Peddy, "amb@code_human_in_bus_passenger_idles@female@sit@idle_a", "idle_a", Peddy.Position, Peddy.Rotation);
@@ -1672,7 +1927,7 @@ namespace OnlinePlayerz
                 bPiggyBack = true;
             }// Clones
 
-            //Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, Peddy);
+            //Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, Peddy.Handle);
         }
         private void RoBoCar(Vehicle Atchoo)
         {
@@ -1901,6 +2156,13 @@ namespace OnlinePlayerz
             Function.Call(Hash.TASK_PLAY_ANIM_ADVANCED, peddy.Handle, sAnimDict, sAnimName, AnPos.X, AnPos.Y, AnPos.Z, AnRot.X, AnRot.Y, AnRot.Z, 8.0f, 0.00f, -1, 1, 0.01f, 0, 0);
             Function.Call(Hash.REMOVE_ANIM_DICT, sAnimDict);
         }
+        private void VehAnim(Ped peddy, string sAnimDict, string sAnimName)
+        {
+            Function.Call(Hash.REQUEST_ANIM_DICT, sAnimDict);
+            while (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, sAnimDict))
+                Script.Wait(1);
+            Function.Call(Hash.TASK_PLAY_ANIM, peddy.Handle, sAnimDict, sAnimName, 8.0f, 1.0f, 1000, 33, .1f, false, false, false);
+        }
         private void ClearPedBlips(int iPed)
         {
             GetLogging("ClearPedBlips, iPed == " + iPed);
@@ -1919,30 +2181,28 @@ namespace OnlinePlayerz
                 PeBrain.DirBlip = null;
             }
         }
-        public int NearHiest(bool bLaunch)
+        public int NearHiest()
         {
-            GetLogging("NearHiest, bLaunch == " + bLaunch);
+            GetLogging("NearHiest");
 
             int iNear = -1;
-            List<Vector3> VectorList = new List<Vector3>();
-            VectorList.Add(new Vector3(-1105.577f, -1692.11f, 4.345489f));      //0
-            VectorList.Add(new Vector3(60.53763f, 8.939384f, 69.14648f));       //4
-            VectorList.Add(new Vector3(718.9022f, -980.336f, 24.12285f));       //8
-            VectorList.Add(new Vector3(1681.823f, 4817.896f, 42.01214f));       //12
-            VectorList.Add(new Vector3(-1038.972f, -2736.403f, 20.16928f));     //16
+            List<Vector3> VectorList = new List<Vector3>
+            {
+                new Vector3(-1105.577f, -1692.11f, 4.345489f),      //0
+                new Vector3(60.53763f, 8.939384f, 69.14648f),       //4
+                new Vector3(718.9022f, -980.336f, 24.12285f),       //8
+                new Vector3(1681.823f, 4817.896f, 42.01214f),       //12
+                new Vector3(-1038.972f, -2736.403f, 20.16928f)     //16
+            };
 
             for (int i = 0; i < VectorList.Count; i++)
             {
-                if (VectorList[i].DistanceTo(Game.Player.Character.Position) < 55.00f)
+                if (VectorList[i].DistanceTo(YoPoza()) < 55.00f)
                 {
                     iNear = i;
                     break;
                 }
             }
-
-            if (bLaunch && iNear != -1)
-                HeistDrips(iNear);
-
             return iNear;
         }
         private void HeistDrips(int iMyArea)
@@ -1989,7 +2249,7 @@ namespace OnlinePlayerz
 
             for (int i = 0; i < VectorList.Count; i++)
                 GenPlayerPed(VectorList[i], 90.00f, null, 0, -1);
-
+            iCurrentPlayerz += 4;
             Script.Wait(1200);
             World.AddExplosion(VectorList[0], ExplosionType.Grenade, 7.00f, 15.00f, true, false);
             bHeistPop = false;
@@ -2023,10 +2283,10 @@ namespace OnlinePlayerz
             Function.Call(Hash.SET_BLIP_COLOUR, MyBlip.Handle, iColour);
 
             Function.Call(Hash.BEGIN_TEXT_COMMAND_SET_BLIP_NAME,"STRING");
-            Function.Call(Hash._ADD_TEXT_COMPONENT_STRING,"Player " + sName);
+            Function.Call(Hash._ADD_TEXT_COMPONENT_STRING," Player: " + sName);
             Function.Call(Hash.END_TEXT_COMMAND_SET_BLIP_NAME, MyBlip.Handle);
             Function.Call((Hash)0xF9113A30DE5C6670, "STRING");
-            Function.Call(Hash._ADD_TEXT_COMPONENT_STRING, "Player " + sName);
+            Function.Call(Hash._ADD_TEXT_COMPONENT_STRING, " Player: " + sName);
             Function.Call((Hash)0xBC38B49BCB83BC9B, MyBlip.Handle);
 
             return MyBlip;
@@ -2040,10 +2300,10 @@ namespace OnlinePlayerz
             Function.Call(Hash.SET_BLIP_AS_SHORT_RANGE, MyBlip.Handle, true);
 
             Function.Call(Hash.BEGIN_TEXT_COMMAND_SET_BLIP_NAME, "STRING");
-            Function.Call(Hash._ADD_TEXT_COMPONENT_STRING, "Player " + sName);
+            Function.Call(Hash._ADD_TEXT_COMPONENT_STRING, " Player: " + sName);
             Function.Call(Hash.END_TEXT_COMMAND_SET_BLIP_NAME, MyBlip.Handle);
             Function.Call((Hash)0xF9113A30DE5C6670, "STRING");
-            Function.Call(Hash._ADD_TEXT_COMPONENT_STRING, "Player " + sName);
+            Function.Call(Hash._ADD_TEXT_COMPONENT_STRING, " Player: " + sName);
             Function.Call((Hash)0xBC38B49BCB83BC9B, MyBlip.Handle);
 
             return MyBlip;
@@ -2148,11 +2408,11 @@ namespace OnlinePlayerz
         {
             GetLogging("UniqueLevels");
 
-            int iNumber = LessRandomz(1, 1000, 11);
+            int iNumber = FindRandom(14, 1, 1000);
 
             while (BrainNumberCheck(iNumber))
             {
-                iNumber = LessRandomz(1, 400, 11);
+                iNumber = FindRandom(15, 1, 400);
             }
             return iNumber;
         }
@@ -2163,7 +2423,7 @@ namespace OnlinePlayerz
             bool bRunAgain = false;
             for (int i = 0; i < PedList.Count; i++)
             {
-                if (PedList[i].iLevel == iNumber)
+                if (PedList[i].Level == iNumber)
                 {
                     bRunAgain = true;
                     break;
@@ -2178,14 +2438,932 @@ namespace OnlinePlayerz
             int iAm = -1;
             for (int i = 0; i < PedList.Count; i++)
             {
-                if (PedList[i].iLevel == iNumber)
+                if (PedList[i].Level == iNumber)
                 {
                     iAm = i;
                     break;
                 }
             }
-
             return iAm;
+        }
+        public class PedFixtures
+        {
+            public bool PFMale { get; set; }
+
+            public int PFshapeFirstID { get; set; }
+            public int PFshapeSecondID { get; set; }
+            public int PFshapeThirdID { get; set; }
+            public int PFskinFirstID { get; set; }
+            public int PFskinSecondID { get; set; }
+            public int PFskinThirdID { get; set; }
+            public float PFshapeMix { get; set; }
+            public float PFskinMix { get; set; }
+            public float PFthirdMix { get; set; }
+
+            public List<int> PFFeature { get; set; }
+            public List<int> PFChange { get; set; }
+            public List<int> PFColour { get; set; }
+            public List<float> PFAmount { get; set; }
+
+            public int iHairCut { get; set; }
+            public int PFHair01 { get; set; }
+            public int PFHair02 { get; set; }
+            public ClothBank PedClothB { get; set; }
+
+            public PedFixtures()
+            {
+                PFFeature = new List<int>();
+                PFChange = new List<int>();
+                PFColour = new List<int>();
+                PFAmount = new List<float>();
+            }
+        }
+        private void OnlineFaceTypes(Ped Pedx, bool bMale, Vehicle vMyCar, int iSeat, PedFixtures Fixtures, int iReload)
+        {
+            GetLogging("OnlineFaceTypes, iSeat == " + iSeat + ", iReload == " + iReload);
+
+            PedFixtures MyNewFixings = new PedFixtures();
+
+            int shapeFirstID = 0;
+            int shapeSecondID = 0;
+            int shapeThirdID = 0;
+            int skinFirstID = 1;
+            int skinSecondID = 1;
+            int skinThirdID = 1;
+            float shapeMix = 0.0f;
+            float skinMix = 0.0f;
+            float thirdMix = 0.0f;
+            bool isParent = false;
+
+            if (Fixtures == null)
+            {
+                if (bMale)
+                {
+                    MyNewFixings.PFMale = true;
+                    shapeFirstID = RandInt(0, 20);
+                    shapeSecondID = RandInt(0, 20);
+                    shapeThirdID = shapeFirstID;
+                    skinFirstID = shapeFirstID;
+                    skinSecondID = shapeSecondID;
+                    skinThirdID = shapeThirdID;
+                }
+                else
+                {
+                    MyNewFixings.PFMale = false;
+                    shapeFirstID = RandInt(21, 41);
+                    shapeSecondID = RandInt(21, 41);
+                    shapeThirdID = shapeFirstID;
+                    skinFirstID = shapeFirstID;
+                    skinSecondID = shapeSecondID;
+                    skinThirdID = shapeThirdID;
+                }
+                shapeMix = RandFlow(-0.9f, 0.9f);
+                skinMix = RandFlow(0.9f, 0.99f);
+                thirdMix = RandFlow(-0.9f, 0.9f);
+
+                MyNewFixings.PFshapeFirstID = shapeFirstID;
+                MyNewFixings.PFshapeSecondID = shapeSecondID;
+                MyNewFixings.PFshapeThirdID = shapeThirdID;
+                MyNewFixings.PFskinFirstID = skinFirstID;
+                MyNewFixings.PFskinSecondID = skinSecondID;
+                MyNewFixings.PFskinThirdID = skinThirdID;
+                MyNewFixings.PFshapeMix = shapeMix;
+                MyNewFixings.PFskinMix = skinMix;
+                MyNewFixings.PFthirdMix = thirdMix;
+            }
+            else
+            {
+                bMale = Fixtures.PFMale;
+                shapeFirstID = Fixtures.PFshapeFirstID;
+                shapeSecondID = Fixtures.PFshapeSecondID;
+                shapeThirdID = Fixtures.PFshapeThirdID;
+                skinFirstID = Fixtures.PFskinFirstID;
+                skinSecondID = Fixtures.PFskinSecondID;
+                skinThirdID = Fixtures.PFskinThirdID;
+                shapeMix = Fixtures.PFshapeMix;
+                skinMix = Fixtures.PFskinMix;
+                thirdMix = Fixtures.PFthirdMix;
+            }
+
+            Function.Call(Hash.SET_PED_HEAD_BLEND_DATA, Pedx.Handle, shapeFirstID, shapeSecondID, shapeThirdID, skinFirstID, skinSecondID, skinThirdID, shapeMix, skinMix, thirdMix, isParent);
+
+            int iFeature = 0;
+
+            while (iFeature < 12)
+            {
+                int iColour = 0;
+                int iChange = RandInt(0, Function.Call<int>(Hash._GET_NUM_HEAD_OVERLAY_VALUES, iFeature));
+                float fVar = RandFlow(0.45f, 0.99f);
+
+                if (iFeature == 0)
+                {
+                    iChange = RandInt(0, iChange);
+                }//Blemishes
+                else if (iFeature == 1)
+                {
+                    if (bMale)
+                        iChange = RandInt(0, iChange);
+                    else
+                        iChange = 255;
+                    iColour = 1;
+                }//Facial Hair
+                else if (iFeature == 2)
+                {
+                    iChange = RandInt(0, iChange);
+                    iColour = 1;
+                }//Eyebrows
+                else if (iFeature == 3)
+                {
+                    iChange = 255;
+                }//Ageing
+                else if (iFeature == 4)
+                {
+                    if (RandInt(0, 50) < 40)
+                    {
+                        iChange = RandInt(0, iChange);
+                    }
+                    else
+                        iChange = 255;
+                }//Makeup
+                else if (iFeature == 5)
+                {
+                    if (!bMale)
+                        iChange = RandInt(0, iChange);
+                    else
+                        iChange = 255;
+                    iColour = 2;
+                }//Blush
+                else if (iFeature == 6)
+                {
+                    iChange = RandInt(0, iChange);
+                }//Complexion
+                else if (iFeature == 7)
+                {
+                    iChange = 255;
+                }//Sun Damage
+                else if (iFeature == 8)
+                {
+                    if (!bMale)
+                        iChange = RandInt(0, iChange);
+                    else
+                        iChange = 255;
+                    iColour = 2;
+                }//Lipstick
+                else if (iFeature == 9)
+                {
+                    iChange = RandInt(0, iChange);
+                }//Moles/Freckles
+                else if (iFeature == 10)
+                {
+                    if (bMale)
+                        iChange = RandInt(0, iChange);
+                    else
+                        iChange = 255;
+                    iColour = 1;
+                }//Chest Hair
+                else if (iFeature == 11)
+                {
+                    iChange = RandInt(0, iChange);
+                }//Body Blemishes
+
+                int AddColour = RandInt(0, 64);
+
+                if (Fixtures == null)
+                {
+                    MyNewFixings.PFFeature.Add(iChange);
+                    MyNewFixings.PFColour.Add(AddColour);
+                    MyNewFixings.PFAmount.Add(fVar);
+                }
+                else
+                {
+                    iChange = Fixtures.PFFeature[iFeature];
+                    AddColour = Fixtures.PFColour[iFeature];
+                    fVar = Fixtures.PFAmount[iFeature];
+                }
+
+                Function.Call(Hash.SET_PED_HEAD_OVERLAY, Pedx.Handle, iFeature, iChange, fVar);
+
+                if (iColour > 0)
+                    Function.Call(Hash._SET_PED_HEAD_OVERLAY_COLOR, Pedx.Handle, iFeature, iColour, AddColour, 0);
+
+                iFeature += 1;
+            }
+
+            if (Fixtures == null)
+            {
+                ClothBank MyNewWard = new ClothBank();
+                Function.Call(Hash.CLEAR_ALL_PED_PROPS, Pedx.Handle);
+
+                if (bMale)
+                {
+                    if (MaleCloth.Count > 0)
+                        MyNewWard = MaleCloth[RandInt(0, MaleCloth.Count - 1)];
+                    else
+                    {
+                        int RanChar = RandInt(1, 6);
+                        if (RanChar == 1)
+                        {
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(12);
+                            MyNewWard.ClothB.Add(4);
+
+                            MyNewWard.ClothA.Add(1);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(1);
+                            MyNewWard.ClothB.Add(5);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(65);
+                            MyNewWard.ClothB.Add(3);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(22);
+                            MyNewWard.ClothB.Add(4);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(11);
+                            MyNewWard.ClothB.Add(11);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+                        }
+                        else if (RanChar == 2)
+                        {
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(14);
+                            MyNewWard.ClothB.Add(3);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(17);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(23);
+                            MyNewWard.ClothB.Add(4);
+
+                            MyNewWard.ClothA.Add(40);
+                            MyNewWard.ClothB.Add(1);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(26);
+                            MyNewWard.ClothB.Add(3);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(35);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+                        }
+                        else if (RanChar == 3)
+                        {
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(147);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(167);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(33);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(36);
+                            MyNewWard.ClothB.Add(1);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(-1);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(286);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+                        }
+                        else if (RanChar == 4)
+                        {
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(11);
+                            MyNewWard.ClothB.Add(4);
+
+                            MyNewWard.ClothA.Add(19);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(88);
+                            MyNewWard.ClothB.Add(7);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(14);
+                            MyNewWard.ClothB.Add(2);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(-1);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(273);
+                            MyNewWard.ClothB.Add(15);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+                        }
+                        else if (RanChar == 5)
+                        {
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(125);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(-1);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(114);
+                            MyNewWard.ClothB.Add(6);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(78);
+                            MyNewWard.ClothB.Add(6);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(-1);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(287);
+                            MyNewWard.ClothB.Add(6);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+                        }
+                        else
+                        {
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(134);
+                            MyNewWard.ClothB.Add(8);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(3);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(106);
+                            MyNewWard.ClothB.Add(8);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(83);
+                            MyNewWard.ClothB.Add(8);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(-1);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(274);
+                            MyNewWard.ClothB.Add(8);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+                        }
+                    }
+                }
+                else
+                {
+                    if (FemaleCloth.Count > 0)
+                        MyNewWard = FemaleCloth[RandInt(0, FemaleCloth.Count - 1)];
+                    else
+                    {
+                        int RanChar = RandInt(1, 5);
+                        if (RanChar == 1)
+                        {
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(146);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(-1);
+                            MyNewWard.ClothB.Add(1);
+
+                            MyNewWard.ClothA.Add(113);
+                            MyNewWard.ClothB.Add(1);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(23);
+                            MyNewWard.ClothB.Add(8);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(287);
+                            MyNewWard.ClothB.Add(1);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+                        }
+                        else if (RanChar == 2)
+                        {
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(11);
+                            MyNewWard.ClothB.Add(3);
+
+                            MyNewWard.ClothA.Add(169);
+                            MyNewWard.ClothB.Add(12);
+
+                            MyNewWard.ClothA.Add(93);
+                            MyNewWard.ClothB.Add(4);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(3);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(-1);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(-1);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+                        }
+                        else if (RanChar == 3)
+                        {
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(13);
+                            MyNewWard.ClothB.Add(3);
+
+                            MyNewWard.ClothA.Add(-1);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(98);
+                            MyNewWard.ClothB.Add(4);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(71);
+                            MyNewWard.ClothB.Add(4);
+
+                            MyNewWard.ClothA.Add(1);
+                            MyNewWard.ClothB.Add(5);
+
+                            MyNewWard.ClothA.Add(-1);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(254);
+                            MyNewWard.ClothB.Add(4);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+                        }
+                        else if (RanChar == 4)
+                        {
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(10);
+                            MyNewWard.ClothB.Add(1);
+
+                            MyNewWard.ClothA.Add(15);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(9);
+                            MyNewWard.ClothB.Add(6);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(54);
+                            MyNewWard.ClothB.Add(3);
+
+                            MyNewWard.ClothA.Add(100);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(36);
+                            MyNewWard.ClothB.Add(1);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(13);
+                            MyNewWard.ClothB.Add(5);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+                        }
+                        else if (RanChar == 5)
+                        {
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(2);
+                            MyNewWard.ClothB.Add(3);
+
+                            MyNewWard.ClothA.Add(11);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(75);
+                            MyNewWard.ClothB.Add(1);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(20);
+                            MyNewWard.ClothB.Add(5);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(-1);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(208);
+                            MyNewWard.ClothB.Add(4);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+                        }
+                        else
+                        {
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(134);
+                            MyNewWard.ClothB.Add(8);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(13);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(113);
+                            MyNewWard.ClothB.Add(8);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(87);
+                            MyNewWard.ClothB.Add(8);
+
+                            MyNewWard.ClothA.Add(-1);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(-1);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(0);
+                            MyNewWard.ClothB.Add(0);
+
+                            MyNewWard.ClothA.Add(287);
+                            MyNewWard.ClothB.Add(8);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+
+                            MyNewWard.ExtraA.Add(0);
+                            MyNewWard.ExtraB.Add(0);
+                        }
+                    }
+                }
+
+                MyNewFixings.PedClothB = MyNewWard;
+
+                OnlineSavedWard(Pedx, MyNewWard, bMale);
+            }
+            else
+                OnlineSavedWard(Pedx, Fixtures.PedClothB, bMale);
+
+
+            int iHairStyle = 0;
+            if (Fixtures == null)
+            {
+                if (bMale)
+                    iHairStyle = RandInt(25, 76);
+                else
+                    iHairStyle = RandInt(25, 80);
+
+                MyNewFixings.iHairCut = iHairStyle;
+            }
+            else
+                iHairStyle = Fixtures.iHairCut;
+
+            Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx.Handle, 2, iHairStyle, 0, 2);//hair
+
+            int iHair = RandInt(0, Function.Call<int>(Hash._GET_NUM_HAIR_COLORS));
+            int iHair2 = RandInt(0, Function.Call<int>(Hash._GET_NUM_HAIR_COLORS));
+
+            if (Fixtures == null)
+            {
+                MyNewFixings.PFHair01 = iHair;
+                MyNewFixings.PFHair02 = iHair2;
+            }
+            else
+            {
+                iHair = Fixtures.PFHair01;
+                iHair2 = Fixtures.PFHair02;
+            }
+
+            Function.Call(Hash._SET_PED_HAIR_COLOR, Pedx.Handle, iHair, iHair2);
+
+            if (Fixtures == null)
+                NpcBrains(Pedx, vMyCar, iSeat, MyNewFixings, -1);
+            else
+                NpcBrains(Pedx, vMyCar, iSeat, null, iReload);
+        }
+        private void OnlineSavedWard(Ped Pedx, ClothBank MyCloths, bool bMale)
+        {
+            GetLogging("OnlineSavedWard");
+
+            Function.Call(Hash.CLEAR_ALL_PED_PROPS, Pedx.Handle);
+
+            for (int i = 0; i < MyCloths.ClothA.Count; i++)
+                Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx.Handle, i, MyCloths.ClothA[i], MyCloths.ClothB[i], 2);
+
+            for (int i = 0; i < MyCloths.ExtraA.Count; i++)
+                Function.Call(Hash.SET_PED_PROP_INDEX, Pedx.Handle, i, MyCloths.ExtraA[i], MyCloths.ExtraB[i], false);
         }
         private void NpcBrains(Ped Peddy, Vehicle VeHic, int iSeat, PedFixtures Fixtures, int iReload)
         {
@@ -2193,66 +3371,94 @@ namespace OnlinePlayerz
 
             if (iReload != -1)
             {
-                iReload = ReteaveBrain(iReload);
-                PedList[iReload].ThisPed = Peddy;
-                PedList[iReload].DirBlip = DirectionalBlimp(Peddy);
-                PedList[iReload].ThisBlip = PedBlimp(Peddy, 1, PedList[iReload].sMyName, PedList[iReload].iColours);
-                PedList[iReload].iDeathSequence = 0;
-
-                Function.Call(Hash.SET_PED_CAN_SWITCH_WEAPON, Peddy.Handle, true);
-                Function.Call(Hash.SET_PED_COMBAT_MOVEMENT, Peddy.Handle, 2);
-                Function.Call(Hash.SET_PED_PATH_CAN_USE_CLIMBOVERS, Peddy.Handle, true);
-                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 0, true);
-                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 1, true);
-                if (iAggression > 2)
-                    Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 2, true);
-                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 3, true);
-                Peddy.CanBeTargetted = true;
-
-                if (!PedList[iReload].bFriendly)
+                int iPosNum = ReteaveBrain(iReload);
+                if (iPosNum == -1)
                 {
-                    if (PedList[iReload].iOffRadar == 0 && RandInt(0, 40) < 10)
-                        PedList[iReload].iOffRadar = -1;
-                    FightPlayer(Peddy, false);
+                    Peddy.Delete();
                 }
                 else
                 {
-                    if (PedList[iReload].bFollower)
-                        FolllowTheLeader(Peddy);
-                    else
-                        Peddy.Task.WanderAround();
-                }
+                    PedList[iPosNum].ThisPed = Peddy;
+                    PedList[iPosNum].DirBlip = DirectionalBlimp(Peddy);
+                    PedList[iPosNum].ThisBlip = PedBlimp(Peddy, 1, PedList[iPosNum].MyName, PedList[iPosNum].Colours);
+                    PedList[iPosNum].DeathSequence = 0;
+                    PedList[iPosNum].EnterVehQue = false;
+                    PedList[iPosNum].Befallen = false;
 
-                GunningIt(Peddy);
+                    Function.Call(Hash.SET_PED_CAN_SWITCH_WEAPON, Peddy.Handle, true);
+                    Function.Call(Hash.SET_PED_COMBAT_MOVEMENT, Peddy.Handle, 2);
+                    Function.Call(Hash.SET_PED_PATH_CAN_USE_CLIMBOVERS, Peddy.Handle, true);
+                    Function.Call(Hash.SET_PED_PATH_CAN_USE_LADDERS, Peddy.Handle, true);
+                    Function.Call(Hash.SET_PED_PATH_CAN_DROP_FROM_HEIGHT, Peddy.Handle, true);
+                    Function.Call(Hash.SET_PED_PATH_PREFER_TO_AVOID_WATER, Peddy.Handle, false);
+                    Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 0, true);
+                    Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 1, true);
+                    if (iAggression > 2)
+                        Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 2, true);
+                    Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 3, true);
+                    Peddy.CanBeTargetted = true;
+
+                    if (!PedList[iPosNum].Friendly)
+                    {
+                        Function.Call(Hash.REMOVE_PED_FROM_GROUP, Peddy.Handle);
+                        Peddy.RelationshipGroup = GP_Attack;
+                        if (PedList[iPosNum].OffRadar == 0 && RandInt(0, 40) < 10)
+                            PedList[iPosNum].OffRadar = -1;
+                        FightPlayer(Peddy, false);
+                    }
+                    else
+                    {
+                        if (PedList[iPosNum].Follower)
+                        {
+                            FolllowTheLeader(Peddy);
+                            OhDoKeepUp(Peddy);
+                        }
+                        else
+                        {
+                            Peddy.Task.WanderAround();
+                            Function.Call(Hash.REMOVE_PED_FROM_GROUP, Peddy.Handle);
+                            Peddy.RelationshipGroup = Gp_Friend;
+                        }
+                    }
+                    GunningIt(Peddy);
+                }
             }
             else
             {
-                PlayerBrain MyBrains = new PlayerBrain();
-
-                MyBrains.ThisPed = Peddy;
-                MyBrains.iDeathSequence = 0;
-                MyBrains.iDeathTime = 0;
-                MyBrains.iTimeOn = Game.GameTime + RandInt(iMinSession, iMaxSession);
-                MyBrains.sMyName = SillyNameList();
-                MyBrains.iLevel = UniqueLevels();
-                MyBrains.iKilled = 0;
-                MyBrains.iKills = 0;
-                MyBrains.iFindPlayer = 0;
-                MyBrains.iColours = 0;
-                MyBrains.iOffRadar = 0;
-                MyBrains.bOffRadar = false;
-                MyBrains.bFriendly = true;
-                MyBrains.bHacker = false;
-                MyBrains.bInCombat = false;
-                MyBrains.bBounty = false;
-                MyBrains.bHorny = false;
-                MyBrains.bHorny2 = false;
-                MyBrains.bFollower = false;
-                MyBrains.bSessionJumper = false;
-                MyBrains.bApprochPlayer = false;
-                MyBrains.bDriver = false;
-                MyBrains.bPassenger = false;
-                MyBrains.DirBlip = null;
+                PlayerBrain MyBrains = new PlayerBrain
+                {
+                    ThisPed = Peddy,
+                    PFMySetting = Fixtures,
+                    DeathSequence = 0,
+                    DeathTime = 0,
+                    TimeOn = Game.GameTime + RandInt(iMinSession, iMaxSession),
+                    MyName = SillyNameList(),
+                    Level = UniqueLevels(),
+                    Killed = 0,
+                    Kills = 0,
+                    FindPlayer = 0,
+                    Colours = 0,
+                    OffRadar = 0,
+                    AirAttack = 0,
+                    AirDirect = 0.00f,
+                    OffRadarBool = false,
+                    Friendly = true,
+                    Hacker = false,
+                    InCombat = false,
+                    Bounty = false,
+                    Horny = false,
+                    Horny2 = false,
+                    Follower = false,
+                    SessionJumper = false,
+                    ApprochPlayer = false,
+                    EnterVehQue = false,
+                    Driver = false,
+                    Pilot = false,
+                    Befallen = false,
+                    Passenger = false,
+                    DirBlip = null,
+                    ThisOppress = null
+                };
 
                 if (iSeat == -1)
                     MyBrains.ThisVeh = VeHic;
@@ -2262,74 +3468,94 @@ namespace OnlinePlayerz
                 Function.Call(Hash.SET_PED_CAN_SWITCH_WEAPON, Peddy.Handle, true);
                 Function.Call(Hash.SET_PED_COMBAT_MOVEMENT, Peddy.Handle, 2);
                 Function.Call(Hash.SET_PED_PATH_CAN_USE_CLIMBOVERS, Peddy.Handle, true);
-                Function.Call(Hash.SET_PED_PATH_CAN_DROP_FROM_HEIGHT, Peddy.Handle, true);
                 Function.Call(Hash.SET_PED_PATH_CAN_USE_LADDERS, Peddy.Handle, true);
+                Function.Call(Hash.SET_PED_PATH_CAN_DROP_FROM_HEIGHT, Peddy.Handle, true);
+                Function.Call(Hash.SET_PED_PATH_PREFER_TO_AVOID_WATER, Peddy.Handle, false);
                 Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 0, true);
                 Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 1, true);
                 if (iAggression > 3)
                     Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 2, true);
                 Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 3, true);
                 Peddy.CanBeTargetted = true;
-                //Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 52, true);
 
-                int iBrain = 0;
-                if (iAggression == 11 && !bHackerIn && LessRandomz(0, 40, 0) < 10)
-                    iBrain = 4;
-                else if (iAggression < 3)
+                int iBrain = 1;
+
+                if (iAggression < 4 && VeHic == null)
                 {
-                    iBrain = LessRandomz(0, 40, 0);
-                    if (iBrain < 5)
+                    if (FindRandom(16, 0, 40) < 10)
                         iBrain = 2;
-                    else
-                        iBrain = 1;
                 }
-                else if (iAggression < 7)
+                else if (iAggression < 6)
                 {
-                    iBrain = LessRandomz(0, 40, 0);
-                    if (iBrain < 5)
-                        iBrain = 2;
-                    else if (iBrain < 15)
+                    if (FindRandom(17, 0, 60) < 5)
                         iBrain = 3;
-                    else
-                        iBrain = 1;
+                    else if (VeHic == null)
+                    {
+                        if (FindRandom(18, 0, 40) < 10)
+                            iBrain = 2;
+                    }
+                }
+                else if (iAggression < 8)
+                {
+                    if (FindRandom(19, 0, 60) < 40)
+                        iBrain = 3;
+                    else if (VeHic == null)
+                    {
+                        if (FindRandom(20, 0, 40) < 10)
+                            iBrain = 2;
+                    }
+                }
+                else if (iAggression < 11)
+                {
+                    iBrain = 3;
                 }
                 else
-                    iBrain = 3;
+                {
+                    if (!bHackerIn)
+                        iBrain = 4;
+                    else
+                        iBrain = 3;
+
+                }
 
                 if (iBrain == 1)
                 {
                     Peddy.Task.WanderAround();
                     MyBrains.DirBlip = DirectionalBlimp(Peddy);
-                    MyBrains.ThisBlip = PedBlimp(Peddy, 1, MyBrains.sMyName, 0);
-                    Function.Call(Hash.SET_PED_AS_GROUP_MEMBER, Peddy.Handle, iFollowingNPCs);
+                    MyBrains.ThisBlip = PedBlimp(Peddy, 1, MyBrains.MyName, 0);
+                    Function.Call(Hash.REMOVE_PED_FROM_GROUP, Peddy.Handle);
+                    Peddy.RelationshipGroup = Gp_Friend;
                 }            //Friend
                 else if (iBrain == 2)
                 {
                     Peddy.Task.WanderAround();
                     MyBrains.DirBlip = DirectionalBlimp(Peddy);
-                    MyBrains.ThisBlip = PedBlimp(Peddy, 1, MyBrains.sMyName, 0);
-                    MyBrains.bSessionJumper = true;
+                    MyBrains.ThisBlip = PedBlimp(Peddy, 1, MyBrains.MyName, 0);
+                    MyBrains.SessionJumper = true;
                 }       //Disconect
                 else if (iBrain == 3)
                 {
                     FightPlayer(Peddy, false);
                     MyBrains.DirBlip = DirectionalBlimp(Peddy);
-                    MyBrains.ThisBlip = PedBlimp(Peddy, 1, MyBrains.sMyName, 1);
-                    MyBrains.iColours = 1;
-                    MyBrains.bFriendly = false;
-                    Function.Call(Hash.SET_PED_AS_GROUP_MEMBER, Peddy.Handle, iWarringNPCs);
+                    MyBrains.ThisBlip = PedBlimp(Peddy, 1, MyBrains.MyName, 1);
+                    MyBrains.Colours = 1;
+                    MyBrains.Friendly = false;
+                    Function.Call(Hash.REMOVE_PED_FROM_GROUP, Peddy.Handle);
+                    Peddy.RelationshipGroup = GP_Mental;
                 }       //Enemy
                 else
                 {
                     bHackerIn = true;
                     MyBrains.DirBlip = DirectionalBlimp(Peddy);
-                    MyBrains.ThisBlip = PedBlimp(Peddy, 163, MyBrains.sMyName, 1);
-                    MyBrains.iTimeOn = Game.GameTime + 60000;
-                    MyBrains.iColours = 1;
+                    MyBrains.ThisBlip = PedBlimp(Peddy, 163, MyBrains.MyName, 1);
+                    MyBrains.TimeOn = Game.GameTime + 60000;
+                    MyBrains.Colours = 1;
                     bHackEvent = false;
-                    MyBrains.bFriendly = false;
-                    MyBrains.bHacker = true;
+                    MyBrains.Friendly = false;
+                    MyBrains.Hacker = true;
                     Peddy.IsInvincible = true;
+                    Function.Call(Hash.REMOVE_PED_FROM_GROUP, Peddy.Handle);
+                    Peddy.RelationshipGroup = GP_Mental;
                 }                        //Hacker
 
                 if (VeHic != null)
@@ -2347,25 +3573,17 @@ namespace OnlinePlayerz
                             MyBrains.DirBlip.Remove();
                             MyBrains.DirBlip = null;
                         }
-                        DriveTooo(Peddy, !MyBrains.bFriendly);
-                        int iClass = 0;
-                        if (VeHic.ClassType == VehicleClass.Helicopters)
-                            iClass = 422;
-                        else if (VeHic.ClassType == VehicleClass.Motorcycles)
-                            iClass = 348;
-                        else if (VeHic.ClassType == VehicleClass.Planes)
-                            iClass = 424;
-                        else
-                            iClass = 225;
-                        MyBrains.ThisBlip = PedBlimp(Peddy, OhMyBlip(VeHic.Model.Hash, iClass), MyBrains.sMyName, MyBrains.iColours);
+                        DriveTooo(Peddy, !MyBrains.Friendly);
 
-                        if (MyBrains.bFriendly)
+                        MyBrains.ThisBlip = PedBlimp(Peddy, OhMyBlip(VeHic), MyBrains.MyName, MyBrains.Colours);
+
+                        if (MyBrains.Friendly)
                             MyBrains.ThisPed.CanBeDraggedOutOfVehicle = false;
                         else
-                            Function.Call(Hash.SET_VEHICLE_IS_WANTED, VeHic, true);
+                            Function.Call(Hash.SET_VEHICLE_IS_WANTED, VeHic.Handle, true);
 
-                        MyBrains.bApprochPlayer = true;
-                        MyBrains.bDriver = true;
+                        MyBrains.ApprochPlayer = true;
+                        MyBrains.Driver = true;
                     }
                     else
                     {
@@ -2379,7 +3597,7 @@ namespace OnlinePlayerz
                             MyBrains.DirBlip.Remove();
                             MyBrains.DirBlip = null;
                         }
-                        MyBrains.bPassenger = true;
+                        MyBrains.Passenger = true;
                     }
                 }
                 else if (RandInt(0, 40) < 10 && iAggression > 5)
@@ -2394,20 +3612,16 @@ namespace OnlinePlayerz
                         MyBrains.DirBlip.Remove();
                         MyBrains.DirBlip = null;
                     }
-                    MyBrains.ThisBlip = PedBlimp(Peddy, 303, MyBrains.sMyName, 3);
-                    MyBrains.bBounty = true;
+                    MyBrains.ThisBlip = PedBlimp(Peddy, 303, MyBrains.MyName, 1);
+                    MyBrains.Bounty = true;
                 }
-
-                MyBrains.PFMySetting = Fixtures;
-
+                
                 PedList.Add(MyBrains);
 
                 BackItUpBrain();
 
                 if (iAggression > 1)
                     GunningIt(Peddy);
-
-                iCurrentPlayerz += 1;
             }
         }
         public class PlayerBrain
@@ -2416,37 +3630,44 @@ namespace OnlinePlayerz
             public Vehicle ThisVeh { get; set; }
             public Blip ThisBlip { get; set; }
             public Blip DirBlip { get; set; }
-            public int iDeathSequence { get; set; }
-            public int iDeathTime { get; set; }
-            public int iColours { get; set; }
-            public int iTimeOn { get; set; }
-            public int iLevel { get; set; }
-            public int iKills { get; set; }
-            public int iKilled { get; set; }
-            public int iOffRadar { get; set; }
-            public bool bOffRadar { get; set; }
-            public bool bBounty { get; set; }
-            public bool bHacker { get; set; }
-            public bool bInCombat { get; set; }
-            public bool bFriendly { get; set; }
-            public bool bFollower { get; set; }
-            public bool bApprochPlayer { get; set; }
-            public bool bSessionJumper { get; set; }
-            public bool bHorny { get; set; }
-            public bool bHorny2 { get; set; }
-            public bool bDriver { get; set; }
-            public bool bPassenger { get; set; }
-            public int iFindPlayer { get; set; }
-            public string sMyName { get; set; }
+            public int DeathSequence { get; set; }
+            public int DeathTime { get; set; }
+            public int Colours { get; set; }
+            public int TimeOn { get; set; }
+            public int Level { get; set; }
+            public int Kills { get; set; }
+            public int Killed { get; set; }
+            public int OffRadar { get; set; }
+            public int AirAttack { get; set; }
+            public float AirDirect { get; set; }
+            public bool OffRadarBool { get; set; }
+            public bool Bounty { get; set; }
+            public bool Hacker { get; set; }
+            public bool InCombat { get; set; }
+            public bool Friendly { get; set; }
+            public bool Follower { get; set; }
+            public bool ApprochPlayer { get; set; }
+            public bool SessionJumper { get; set; }
+            public bool Horny { get; set; }
+            public bool Horny2 { get; set; }
+            public bool Driver { get; set; }
+            public bool Pilot { get; set; }
+            public bool EnterVehQue { get; set; }
+            public bool Passenger { get; set; }
+            public bool Befallen { get; set; }
+            public int FindPlayer { get; set; }
+            public string MyName { get; set; }
             public PedFixtures PFMySetting { get; set; }
+
+            public Vehicle ThisOppress { get; set; }
         }
         public class AfkPlayer
         {
             public Blip ThisBlip { get; set; }
-            public int iTimeOn { get; set; }
-            public int iApp { get; set; }
-            public string sMyName { get; set; }
-            public int iLevel { get; set; }
+            public int TimeOn { get; set; }
+            public int App { get; set; }
+            public string MyName { get; set; }
+            public int Level { get; set; }
         }
         public PlayerBrain ThisBrian(int iCurrent)
         {
@@ -2571,7 +3792,6 @@ namespace OnlinePlayerz
                         Ped Peed = new Ped(iHandles);
                         Peed.Delete();
                     }
-
                 }
                 else if (iType == 2)
                 {
@@ -2596,14 +3816,15 @@ namespace OnlinePlayerz
             GetLogging("LaggOut");
 
             PlayerDump();
-
-            while (!bSearching)
+            bool bSearching = true;
+            while (bSearching)
             {
-                Script.Wait(RandInt(500, 2000));
+                Script.Wait(100);
                 PlayerDump();
                 if (PedList.Count == 0)
-                    bSearching = true;
+                    bSearching = false;
             }
+            iFollow = 0;
         }
         private void PlayerDump()
         { 
@@ -2611,8 +3832,18 @@ namespace OnlinePlayerz
 
             for (int i = 0; i < PedList.Count; i++)
             {
-                GetOutVehicle(PedList[i].ThisPed, PedList[i].iLevel);
-                PedCleaning(PedList[i].iLevel, "left", false);
+                if (PedList[i].ThisPed != null)
+                {
+                    if (PedList[i].ThisPed.Exists())
+                    {
+                        GetOutVehicle(PedList[i].ThisPed, PedList[i].Level);
+                        PedCleaning(PedList[i].Level, "left", false);
+                    }
+                    else
+                        PedList.RemoveAt(i);
+                }
+                else
+                    PedList.RemoveAt(i);
             }
 
             for (int i = 0; i < AFKList.Count; i++)
@@ -2620,10 +3851,28 @@ namespace OnlinePlayerz
                 DeListingBrains(false, i, true);
                 iCurrentPlayerz -= 1;
             }
+
+            MakeFrenz.Clear();
+            MakeCarz.Clear();
+            GetInQUe.Clear();
         }
-        public int OhMyBlip(int iVehHash, int iBeLip)
+        public int OhMyBlip(Vehicle MyVehic)
         {
-            GetLogging("OhMyBlip, iVehHash == " + iVehHash + ", iBeLip == " + iBeLip);
+            GetLogging("OhMyBlip");
+
+            int iVehHash = MyVehic.Model.GetHashCode();
+            int iBeLip = 1;
+
+            if (MyVehic.ClassType == VehicleClass.Boats)
+                iBeLip = 427;
+            else if (MyVehic.ClassType == VehicleClass.Helicopters)
+                iBeLip = 422;
+            else if (MyVehic.ClassType == VehicleClass.Motorcycles)
+                iBeLip = 226;
+            else if (MyVehic.ClassType == VehicleClass.Planes)
+                iBeLip = 424;
+            else
+                iBeLip = 225;
 
             if (iVehHash == Function.Call<int>(Hash.GET_HASH_KEY, "CRUSADER"))
                 iBeLip = 800;
@@ -2750,954 +3999,6 @@ namespace OnlinePlayerz
             }
             return iShoot;
         }
-        public class PedFixtures
-        {
-            public bool PFMale { get; set; }
-
-            public int PFshapeFirstID { get; set; }
-            public int PFshapeSecondID { get; set; }
-            public int PFshapeThirdID { get; set; }
-            public int PFskinFirstID { get; set; }
-            public int PFskinSecondID { get; set; }
-            public int PFskinThirdID { get; set; }
-            public float PFshapeMix { get; set; }
-            public float PFskinMix { get; set; }
-            public float PFthirdMix { get; set; }
-
-            public List<int> PFFeature { get; set; }
-            public List<int> PFChange { get; set; }
-            public List<int> PFColour { get; set; }
-            public List<int> PFHeadColour { get; set; }
-            public List<float> PFAmount { get; set; }
-
-            public int PFHair01 { get; set; }
-            public int PFHair02 { get; set; }
-
-            public List<int> PFClothA { get; set; }
-            public List<int> PFClothB { get; set; }
-
-            public List<int> PFExtraA { get; set; }
-            public List<int> PFExtraB { get; set; }
-
-            public PedFixtures()
-            {
-                PFFeature = new List<int>();
-                PFChange = new List<int>();
-                PFColour = new List<int>();
-                PFHeadColour = new List<int>();
-                PFAmount = new List<float>();
-                PFClothA = new List<int>();
-                PFClothB = new List<int>();
-                PFExtraA = new List<int>();
-                PFExtraB = new List<int>();
-            }
-        }
-        private void OnlineFaceTypes(Ped Pedx, bool bMale, Vehicle vMyCar, int iSeat, PedFixtures Fixtures, int iReload)
-        {
-            GetLogging("OnlineFaceTypes, iSeat == " + iSeat + ", iReload == " + iReload);
-
-            if (iReload != -1)
-                iReload = ReteaveBrain(iReload);
-
-            int shapeFirstID = 0;
-            int shapeSecondID = 0;
-            int shapeThirdID = 0;
-            int skinFirstID = 1;
-            int skinSecondID = 1;
-            int skinThirdID = 1;
-            float shapeMix = 0.0f;
-            float skinMix = 0.0f;
-            float thirdMix = 0.0f;
-            bool isParent = false;
-
-            if (bMale)
-            {
-                shapeFirstID = RandInt(0, 20);
-                shapeSecondID = RandInt(0, 20);
-                shapeThirdID = shapeFirstID;
-                skinFirstID = shapeFirstID;
-                skinSecondID = shapeSecondID;
-                skinThirdID = shapeThirdID;
-            }
-            else
-            {
-                shapeFirstID = RandInt(21, 41);
-                shapeSecondID = RandInt(21, 41);
-                shapeThirdID = shapeFirstID;
-                skinFirstID = shapeFirstID;
-                skinSecondID = shapeSecondID;
-                skinThirdID = shapeThirdID;
-            }
-            shapeMix = RandFlow(-0.9f, 0.9f);
-            skinMix = RandFlow(0.9f, 0.99f);
-            thirdMix = RandFlow(-0.9f, 0.9f);
-
-            if (Fixtures != null)
-            {
-                Fixtures.PFshapeFirstID = shapeFirstID;
-                Fixtures.PFshapeSecondID = shapeSecondID;
-                Fixtures.PFshapeThirdID = shapeThirdID;
-                Fixtures.PFskinFirstID = skinFirstID;
-                Fixtures.PFskinSecondID = skinSecondID;
-                Fixtures.PFskinThirdID = skinThirdID;
-                Fixtures.PFshapeMix = shapeMix;
-                Fixtures.PFskinMix = skinMix;
-                Fixtures.PFthirdMix = thirdMix;
-            }
-            else
-            {
-                shapeFirstID = PedList[iReload].PFMySetting.PFshapeFirstID;
-                shapeSecondID = PedList[iReload].PFMySetting.PFshapeSecondID;
-                shapeThirdID = PedList[iReload].PFMySetting.PFshapeThirdID;
-                skinFirstID = PedList[iReload].PFMySetting.PFskinFirstID;
-                skinSecondID = PedList[iReload].PFMySetting.PFskinSecondID;
-                skinThirdID = PedList[iReload].PFMySetting.PFskinThirdID;
-                shapeMix = PedList[iReload].PFMySetting.PFshapeMix;
-                skinMix = PedList[iReload].PFMySetting.PFskinMix;
-                thirdMix = PedList[iReload].PFMySetting.PFthirdMix;
-            }
-
-            Function.Call(Hash.SET_PED_HEAD_BLEND_DATA, Pedx.Handle, shapeFirstID, shapeSecondID, shapeThirdID, skinFirstID, skinSecondID, skinThirdID, shapeMix, skinMix, thirdMix, isParent);
-
-            int iFeature = 0;
-
-            while (iFeature < 12)
-            {
-                int iColour = 0;
-                int iChange = RandInt(0, Function.Call<int>(Hash._GET_NUM_HEAD_OVERLAY_VALUES, iFeature));
-                float fVar = RandFlow(0.45f, 0.99f);
-
-                if (iFeature == 0)
-                {
-                    iChange = RandInt(0, iChange);
-                }//Blemishes
-                else if (iFeature == 1)
-                {
-                    if (bMale)
-                        iChange = RandInt(0, iChange);
-                    else
-                        iChange = 255;
-                    iColour = 1;
-                }//Facial Hair
-                else if (iFeature == 2)
-                {
-                    iChange = RandInt(0, iChange);
-                    iColour = 1;
-                }//Eyebrows
-                else if (iFeature == 3)
-                {
-                    iChange = 255;
-                }//Ageing
-                else if (iFeature == 4)
-                {
-                    if (RandInt(0, 50) < 40)
-                    {
-                        iChange = RandInt(0, iChange);
-                    }
-                    else
-                        iChange = 255;
-                }//Makeup
-                else if (iFeature == 5)
-                {
-                    if (!bMale)
-                        iChange = RandInt(0, iChange);
-                    else
-                        iChange = 255;
-                    iColour = 2;
-                }//Blush
-                else if (iFeature == 6)
-                {
-                    iChange = RandInt(0, iChange);
-                }//Complexion
-                else if (iFeature == 7)
-                {
-                    iChange = 255;
-                }//Sun Damage
-                else if (iFeature == 8)
-                {
-                    if (!bMale)
-                        iChange = RandInt(0, iChange);
-                    else
-                        iChange = 255;
-                    iColour = 2;
-                }//Lipstick
-                else if (iFeature == 9)
-                {
-                    iChange = RandInt(0, iChange);
-                }//Moles/Freckles
-                else if (iFeature == 10)
-                {
-                    if (bMale)
-                        iChange = RandInt(0, iChange);
-                    else
-                        iChange = 255;
-                    iColour = 1;
-                }//Chest Hair
-                else if (iFeature == 11)
-                {
-                    iChange = RandInt(0, iChange);
-                }//Body Blemishes
-
-                int AddColour = RandInt(0, 64);
-
-                if (Fixtures != null)
-                {
-                    Fixtures.PFFeature.Add(iChange);
-                    Fixtures.PFColour.Add(AddColour);
-                    Fixtures.PFAmount.Add(fVar);
-                }
-                else
-                {
-                    iChange = PedList[iReload].PFMySetting.PFFeature[iFeature];
-                    AddColour = PedList[iReload].PFMySetting.PFColour[iFeature];
-                    fVar = PedList[iReload].PFMySetting.PFAmount[iFeature];
-                }
-
-                Function.Call(Hash.SET_PED_HEAD_OVERLAY, Pedx.Handle, iFeature, iChange, fVar);
-
-                if (iColour > 0)
-                    Function.Call(Hash._SET_PED_HEAD_OVERLAY_COLOR, Pedx.Handle, iFeature, iColour, AddColour, 0);
-
-                int iCount = Function.Call<int>(Hash.GET_NUMBER_OF_PED_DRAWABLE_VARIATIONS, Game.Player.Character, 2);
-                int iAm = RandInt(1, iCount);
-                while (iAm == 24)
-                    iAm = RandInt(1, iCount);
-
-                if (Fixtures != null)
-                    Fixtures.PFHeadColour.Add(iAm);
-                else
-                    iAm = PedList[iReload].PFMySetting.PFHeadColour[iFeature];
-
-                Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, 2, iAm, 0, 2);//hair
-
-                iFeature += 1;
-            }
-            int iHair = RandInt(0, Function.Call<int>(Hash._GET_NUM_HAIR_COLORS));
-            int iHair2 = RandInt(0, Function.Call<int>(Hash._GET_NUM_HAIR_COLORS));
-
-            if (Fixtures != null)
-            {
-                Fixtures.PFHair01 = iHair;
-                Fixtures.PFHair02 = iHair2;
-            }
-            else
-            {
-                iHair = PedList[iReload].PFMySetting.PFHair01;
-                iHair2 = PedList[iReload].PFMySetting.PFHair02;
-            }
-
-            Function.Call(Hash._SET_PED_HAIR_COLOR, Pedx.Handle, iHair, iHair2);
-
-            if (iReload != -1)
-                OnlineWardrobe(Pedx, bMale, vMyCar, iSeat, Fixtures, PedList[iReload].iLevel);
-            else
-                OnlineWardrobe(Pedx, bMale, vMyCar, iSeat, Fixtures, iReload);
-        }
-        private void OnlineWardrobe(Ped Pedx, bool bMale, Vehicle vMyCar, int iSeat, PedFixtures Fixtures, int iReload)
-        {
-            GetLogging("OnlineWardrobe, iSeat == " + iSeat + ", iReload == " + iReload);
-
-            if (iReload != -1)
-                iReload = ReteaveBrain(iReload);
-
-            if (Fixtures != null)
-            {
-                ClothBank MyWard = new ClothBank();
-                Function.Call(Hash.CLEAR_ALL_PED_PROPS, Pedx);
-
-                if (bMale)
-                {
-                    if (MaleCloth.Count > 0)
-                        MyWard = MaleCloth[RandInt(0, MaleCloth.Count - 1)];
-                    else
-                    {
-                        int RanChar = RandInt(1, 6);
-                        if (RanChar == 1)
-                        {
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(12);
-                            MyWard.ClothB.Add(4);
-
-                            MyWard.ClothA.Add(1);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(1);
-                            MyWard.ClothB.Add(5);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(65);
-                            MyWard.ClothB.Add(3);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(22);
-                            MyWard.ClothB.Add(4);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(11);
-                            MyWard.ClothB.Add(11);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-                        }
-                        else if (RanChar == 2)
-                        {
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(14);
-                            MyWard.ClothB.Add(3);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(17);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(23);
-                            MyWard.ClothB.Add(4);
-
-                            MyWard.ClothA.Add(40);
-                            MyWard.ClothB.Add(1);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(26);
-                            MyWard.ClothB.Add(3);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(35);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-                        }
-                        else if (RanChar == 3)
-                        {
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(147);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(167);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(33);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(36);
-                            MyWard.ClothB.Add(1);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(-1);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(286);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-                        }
-                        else if (RanChar == 4)
-                        {
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(11);
-                            MyWard.ClothB.Add(4);
-
-                            MyWard.ClothA.Add(19);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(88);
-                            MyWard.ClothB.Add(7);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(14);
-                            MyWard.ClothB.Add(2);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(-1);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(273);
-                            MyWard.ClothB.Add(15);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-                        }
-                        else if (RanChar == 5)
-                        {
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(125);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(-1);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(114);
-                            MyWard.ClothB.Add(6);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(78);
-                            MyWard.ClothB.Add(6);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(-1);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(287);
-                            MyWard.ClothB.Add(6);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-                        }
-                        else
-                        {
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(134);
-                            MyWard.ClothB.Add(8);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(3);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(106);
-                            MyWard.ClothB.Add(8);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(83);
-                            MyWard.ClothB.Add(8);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(-1);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(274);
-                            MyWard.ClothB.Add(8);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-                        }
-                    }
-                }
-                else
-                {
-                    if (FemaleCloth.Count > 0)
-                        MyWard = FemaleCloth[RandInt(0, FemaleCloth.Count - 1)];
-                    else
-                    {
-                        int RanChar = RandInt(1, 5);
-                        if (RanChar == 1)
-                        {
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(146);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(-1);
-                            MyWard.ClothB.Add(1);
-
-                            MyWard.ClothA.Add(113);
-                            MyWard.ClothB.Add(1);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(23);
-                            MyWard.ClothB.Add(8);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(287);
-                            MyWard.ClothB.Add(1);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-                        }
-                        else if (RanChar == 2)
-                        {
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(11);
-                            MyWard.ClothB.Add(3);
-
-                            MyWard.ClothA.Add(169);
-                            MyWard.ClothB.Add(12);
-
-                            MyWard.ClothA.Add(93);
-                            MyWard.ClothB.Add(4);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(3);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(-1);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(-1);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-                        }
-                        else if (RanChar == 3)
-                        {
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(13);
-                            MyWard.ClothB.Add(3);
-
-                            MyWard.ClothA.Add(-1);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(98);
-                            MyWard.ClothB.Add(4);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(71);
-                            MyWard.ClothB.Add(4);
-
-                            MyWard.ClothA.Add(1);
-                            MyWard.ClothB.Add(5);
-
-                            MyWard.ClothA.Add(-1);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(254);
-                            MyWard.ClothB.Add(4);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-                        }
-                        else if (RanChar == 4)
-                        {
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(10);
-                            MyWard.ClothB.Add(1);
-
-                            MyWard.ClothA.Add(15);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(9);
-                            MyWard.ClothB.Add(6);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(54);
-                            MyWard.ClothB.Add(3);
-
-                            MyWard.ClothA.Add(100);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(36);
-                            MyWard.ClothB.Add(1);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(13);
-                            MyWard.ClothB.Add(5);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-                        }
-                        else if (RanChar == 5)
-                        {
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(2);
-                            MyWard.ClothB.Add(3);
-
-                            MyWard.ClothA.Add(11);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(75);
-                            MyWard.ClothB.Add(1);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(20);
-                            MyWard.ClothB.Add(5);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(-1);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(208);
-                            MyWard.ClothB.Add(4);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-                        }
-                        else
-                        {
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(134);
-                            MyWard.ClothB.Add(8);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(13);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(113);
-                            MyWard.ClothB.Add(8);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(87);
-                            MyWard.ClothB.Add(8);
-
-                            MyWard.ClothA.Add(-1);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(-1);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(0);
-                            MyWard.ClothB.Add(0);
-
-                            MyWard.ClothA.Add(287);
-                            MyWard.ClothB.Add(8);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-
-                            MyWard.ExtraA.Add(0);
-                            MyWard.ExtraB.Add(0);
-                        }
-                    }
-                }
-
-                Fixtures.PFClothA = MyWard.ClothA;
-                Fixtures.PFClothB = MyWard.ClothB;
-
-                Fixtures.PFExtraA = MyWard.ExtraA;
-                Fixtures.PFExtraB = MyWard.ExtraB;
-
-                OnlineSavedWard(Pedx, MyWard);
-            }
-            else
-            {
-                ClothBank DisBank = new ClothBank();
-
-                DisBank.ClothA = PedList[iReload].PFMySetting.PFClothA;
-                DisBank.ClothB = PedList[iReload].PFMySetting.PFClothB;
-
-                DisBank.ExtraA = PedList[iReload].PFMySetting.PFExtraA;
-                DisBank.ExtraB = PedList[iReload].PFMySetting.PFExtraB;
-
-                OnlineSavedWard(Pedx, DisBank);
-            }
-
-            if (iReload != -1)
-                NpcBrains(Pedx, vMyCar, iSeat, Fixtures, PedList[iReload].iLevel);
-            else
-                NpcBrains(Pedx, vMyCar, iSeat, Fixtures, iReload);
-        }
-        private void OnlineSavedWard(Ped Pedx, ClothBank MyCloths)
-        {
-            GetLogging("OnlineSavedWard");
-
-            Function.Call(Hash.CLEAR_ALL_PED_PROPS, Pedx);
-
-            for (int i = 0; i < MyCloths.ClothA.Count; i++)
-                Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx, i, MyCloths.ClothA[i], MyCloths.ClothB[i], 2);
-
-            for (int i = 0; i < MyCloths.ExtraA.Count; i++)
-                Function.Call(Hash.SET_PED_PROP_INDEX, Pedx, i, MyCloths.ExtraA[i], MyCloths.ExtraB[i], false);
-        }
         private void Scaleform_PLAYER_LIST()
         {
             GetLogging("Scaleform_PLAYER_LIST");
@@ -3718,7 +4019,7 @@ namespace OnlinePlayerz
             for (int i = 0; i < PedList.Count; i++)
             {
                 int iFailed = 0;
-                string sPlayer = PedList[i].sMyName;
+                string sPlayer = PedList[i].MyName;
                 while (sPlayer.Count() < 14 && iFailed < 10)
                 {
                     sPlayer = sPlayer + " ";
@@ -3726,7 +4027,7 @@ namespace OnlinePlayerz
                     iFailed += 1;
                 }
 
-                sPlayer = sPlayer + PedList[i].iLevel;
+                sPlayer = sPlayer + PedList[i].Level;
                 Function.Call(Hash._PUSH_SCALEFORM_MOVIE_FUNCTION, iScale, "SET_DATA_SLOT");
                 Function.Call(Hash._PUSH_SCALEFORM_MOVIE_FUNCTION_PARAMETER_INT, iAddOns);
                 Function.Call(Hash._PUSH_SCALEFORM_MOVIE_FUNCTION_PARAMETER_STRING, sPlayer);
@@ -3736,7 +4037,7 @@ namespace OnlinePlayerz
             for (int i = 0; i < AFKList.Count; i++)
             {
                 int iFailed = 0;
-                string sPlayer = AFKList[i].sMyName;
+                string sPlayer = AFKList[i].MyName;
                 while (sPlayer.Count() < 14 && iFailed < 10)
                 {
                     sPlayer = sPlayer + " ";
@@ -3744,7 +4045,7 @@ namespace OnlinePlayerz
                     iFailed += 1;
                 }
 
-                sPlayer = sPlayer + AFKList[i].iLevel;
+                sPlayer = sPlayer + AFKList[i].Level;
                 Function.Call(Hash._PUSH_SCALEFORM_MOVIE_FUNCTION, iScale, "SET_DATA_SLOT");
                 Function.Call(Hash._PUSH_SCALEFORM_MOVIE_FUNCTION_PARAMETER_INT, iAddOns);
                 Function.Call(Hash._PUSH_SCALEFORM_MOVIE_FUNCTION_PARAMETER_STRING, sPlayer);
@@ -3799,10 +4100,14 @@ namespace OnlinePlayerz
             }
             CloseBaseHelpBar();
 
-            if (ButtonDown(iClearPlayList, false) && !bDisabled)
-                LaggOut();
-            else if (ButtonDown(iDisableMod, false))
-                bDisabled = !bDisabled;
+            while (ButtonDown(iGetlayList, true))
+            {
+                Script.Wait(500); 
+                if (WhileButtonDown(iClearPlayList, true) && !bDisabled)
+                    LaggOut();
+                else if (WhileButtonDown(iDisableMod, true))
+                    bDisabled = !bDisabled;
+            }
         }
         private void FireOrb(int MyBrian, Ped Target)
         {
@@ -3814,19 +4119,21 @@ namespace OnlinePlayerz
             {
                 MyBrian = ReteaveBrain(MyBrian);
 
-                List<Vector3> FacList = new List<Vector3>();
-                FacList.Add(new Vector3(1871.856f, 280.2685f, 164.3017f));
-                FacList.Add(new Vector3(2074.258f, 1749.33f, 104.5142f));
-                FacList.Add(new Vector3(2768.607f, 3919.833f, 45.81805f));
-                FacList.Add(new Vector3(3407.416f, 5504.874f, 26.27827f));
-                FacList.Add(new Vector3(1.844208f, 6832.069f, 15.81715f));
-                FacList.Add(new Vector3(-2231.331f, 2417.907f, 12.18127f));
-                FacList.Add(new Vector3(-6.777428f, 3326.627f, 41.63125f));
-                FacList.Add(new Vector3(18.59906f, 2610.94f, 85.99267f));
-                FacList.Add(new Vector3(1286.877f, 2846.37f, 49.39426f));
+                List<Vector3> FacList = new List<Vector3>
+                {
+                    new Vector3(1871.856f, 280.2685f, 164.3017f),
+                    new Vector3(2074.258f, 1749.33f, 104.5142f),
+                    new Vector3(2768.607f, 3919.833f, 45.81805f),
+                    new Vector3(3407.416f, 5504.874f, 26.27827f),
+                    new Vector3(1.844208f, 6832.069f, 15.81715f),
+                    new Vector3(-2231.331f, 2417.907f, 12.18127f),
+                    new Vector3(-6.777428f, 3326.627f, 41.63125f),
+                    new Vector3(18.59906f, 2610.94f, 85.99267f),
+                    new Vector3(1286.877f, 2846.37f, 49.39426f)
+                };
 
-                ClearPedBlips(PedList[MyBrian].iLevel);
-                PedList[MyBrian].ThisBlip = LocalBlip(FacList[RandInt(0, FacList.Count - 1)], 590, PedList[MyBrian].sMyName);
+                ClearPedBlips(PedList[MyBrian].Level);
+                PedList[MyBrian].ThisBlip = LocalBlip(FacList[RandInt(0, FacList.Count - 1)], 590, PedList[MyBrian].MyName);
 
                 pFired = PedList[MyBrian].ThisPed;
                 Script.Wait(7500);
@@ -3842,9 +4149,9 @@ namespace OnlinePlayerz
                 OrbExp(pFired, PlayePos, PlayerF, PlayerB, PlayerR, PlayerL);
                 if (MyBrian != -1)
                 {
-                    OrbLoad(PedList[MyBrian].sMyName);
+                    OrbLoad(PedList[MyBrian].MyName);
                     Script.Wait(4000);
-                    PedCleaning(PedList[MyBrian].iLevel, "left", false);
+                    PedCleaning(PedList[MyBrian].Level, "left", false);
                 }
             }
         }
@@ -3899,368 +4206,370 @@ namespace OnlinePlayerz
         }
         public string ControlSybols(int iButton)
         {
-            List<string> ControlList = new List<string>();
-            ControlList.Add(" ~INPUT_NEXT_CAMERA~ ");//V~ ");//BACK
-            ControlList.Add(" ~INPUT_LOOK_LR~ ");//MOUSE RIGHT~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_LOOK_UD~ ");//MOUSE DOWN~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_LOOK_UP_ONLY~ ");//(NONE);~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_LOOK_DOWN_ONLY~ ");//MOUSE DOWN~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_LOOK_LEFT_ONLY~ ");//(NONE);~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_LOOK_RIGHT_ONLY~ ");//MOUSE RIGHT~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_CINEMATIC_SLOWMO~ ");//(NONE);~ ");//R3
-            ControlList.Add(" ~INPUT_SCRIPTED_FLY_UD~ ");//S~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_SCRIPTED_FLY_LR~ ");//D~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_SCRIPTED_FLY_ZUP~ ");//PAGEUP~ ");//LT
-            ControlList.Add(" ~INPUT_SCRIPTED_FLY_ZDOWN~ ");//PAGEDOWN~ ");//RT
-            ControlList.Add(" ~INPUT_WEAPON_WHEEL_UD~ ");//MOUSE DOWN~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_WEAPON_WHEEL_LR~ ");//MOUSE RIGHT~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_WEAPON_WHEEL_NEXT~ ");//SCROLLWHEEL DOWN~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_WEAPON_WHEEL_PREV~ ");//SCROLLWHEEL UP~ ");//DPAD LEFT
-            ControlList.Add(" ~INPUT_SELECT_NEXT_WEAPON~ ");//SCROLLWHEEL DOWN~ ");//(NONE);
-            ControlList.Add(" ~INPUT_SELECT_PREV_WEAPON~ ");//SCROLLWHEEL UP~ ");//(NONE);
-            ControlList.Add(" ~INPUT_SKIP_CUTSCENE~ ");//ENTER / LEFT MOUSE BUTTON / SPACEBAR~ ");//A
-            ControlList.Add(" ~INPUT_CHARACTER_WHEEL~ ");//LEFT ALT~ ");//DPAD DOWN
-            ControlList.Add(" ~INPUT_MULTIPLAYER_INFO~ ");//Z~ ");//DPAD DOWN
-            ControlList.Add(" ~INPUT_SPRINT~ ");//LEFT SHIFT~ ");//A
-            ControlList.Add(" ~INPUT_JUMP~ ");//SPACEBAR~ ");//X
-            ControlList.Add(" ~INPUT_ENTER~ ");//F~ ");//Y
-            ControlList.Add(" ~INPUT_ATTACK~ ");//LEFT MOUSE BUTTON~ ");//RT
-            ControlList.Add(" ~INPUT_AIM~ ");//RIGHT MOUSE BUTTON~ ");//LT
-            ControlList.Add(" ~INPUT_LOOK_BEHIND~ ");//C~ ");//R3
-            ControlList.Add(" ~INPUT_PHONE~ ");//ARROW UP / SCROLLWHEEL BUTTON (PRESS);~ ");//DPAD UP
-            ControlList.Add(" ~INPUT_SPECIAL_ABILITY~ ");//(NONE);~ ");//L3
-            ControlList.Add(" ~INPUT_SPECIAL_ABILITY_SECONDARY~ ");//B~ ");//R3
-            ControlList.Add(" ~INPUT_MOVE_LR~ ");//D~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_MOVE_UD~ ");//S~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_MOVE_UP_ONLY~ ");//W~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_MOVE_DOWN_ONLY~ ");//S~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_MOVE_LEFT_ONLY~ ");//A~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_MOVE_RIGHT_ONLY~ ");//D~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_DUCK~ ");//LEFT CTRL~ ");//L3
-            ControlList.Add(" ~INPUT_SELECT_WEAPON~ ");//TAB~ ");//LB
-            ControlList.Add(" ~INPUT_PICKUP~ ");//E~ ");//LB
-            ControlList.Add(" ~INPUT_SNIPER_ZOOM~ ");//[~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_SNIPER_ZOOM_IN_ONLY~ ");//]~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_SNIPER_ZOOM_OUT_ONLY~ ");//[~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_SNIPER_ZOOM_IN_SECONDARY~ ");//]~ ");//DPAD UP
-            ControlList.Add(" ~INPUT_SNIPER_ZOOM_OUT_SECONDARY~ ");//[~ ");//DPAD DOWN
-            ControlList.Add(" ~INPUT_COVER~ ");//Q~ ");//RB
-            ControlList.Add(" ~INPUT_RELOAD~ ");//R~ ");//B
-            ControlList.Add(" ~INPUT_TALK~ ");//E~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_DETONATE~ ");//G~ ");//DPAD LEFT
-            ControlList.Add(" ~INPUT_HUD_SPECIAL~ ");//Z~ ");//DPAD DOWN
-            ControlList.Add(" ~INPUT_ARREST~ ");//F~ ");//Y
-            ControlList.Add(" ~INPUT_ACCURATE_AIM~ ");//SCROLLWHEEL DOWN~ ");//R3
-            ControlList.Add(" ~INPUT_CONTEXT~ ");//E~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_CONTEXT_SECONDARY~ ");//Q~ ");//DPAD LEFT
-            ControlList.Add(" ~INPUT_WEAPON_SPECIAL~ ");//(NONE);~ ");//Y
-            ControlList.Add(" ~INPUT_WEAPON_SPECIAL_TWO~ ");//E~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_DIVE~ ");//SPACEBAR~ ");//RB
-            ControlList.Add(" ~INPUT_DROP_WEAPON~ ");//F9~ ");//Y
-            ControlList.Add(" ~INPUT_DROP_AMMO~ ");//F10~ ");//B
-            ControlList.Add(" ~INPUT_THROW_GRENADE~ ");//G~ ");//DPAD LEFT
-            ControlList.Add(" ~INPUT_VEH_MOVE_LR~ ");//D~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_MOVE_UD~ ");//LEFT CTRL~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_MOVE_UP_ONLY~ ");//LEFT SHIFT~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_MOVE_DOWN_ONLY~ ");//LEFT CTRL~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_MOVE_LEFT_ONLY~ ");//A~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_MOVE_RIGHT_ONLY~ ");//D~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_SPECIAL~ ");//(NONE);~ ");//(NONE);
-            ControlList.Add(" ~INPUT_VEH_GUN_LR~ ");//MOUSE RIGHT~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_VEH_GUN_UD~ ");//MOUSE DOWN~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_VEH_AIM~ ");//RIGHT MOUSE BUTTON~ ");//LB
-            ControlList.Add(" ~INPUT_VEH_ATTACK~ ");//LEFT MOUSE BUTTON~ ");//RB
-            ControlList.Add(" ~INPUT_VEH_ATTACK2~ ");//RIGHT MOUSE BUTTON~ ");//A
-            ControlList.Add(" ~INPUT_VEH_ACCELERATE~ ");//W~ ");//RT
-            ControlList.Add(" ~INPUT_VEH_BRAKE~ ");//S~ ");//LT
-            ControlList.Add(" ~INPUT_VEH_DUCK~ ");//X~ ");//A
-            ControlList.Add(" ~INPUT_VEH_HEADLIGHT~ ");//H~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_VEH_EXIT~ ");//F~ ");//Y
-            ControlList.Add(" ~INPUT_VEH_HANDBRAKE~ ");//SPACEBAR~ ");//RB
-            ControlList.Add(" ~INPUT_VEH_HOTWIRE_LEFT~ ");//W~ ");//LT
-            ControlList.Add(" ~INPUT_VEH_HOTWIRE_RIGHT~ ");//S~ ");//RT
-            ControlList.Add(" ~INPUT_VEH_LOOK_BEHIND~ ");//C~ ");//R3
-            ControlList.Add(" ~INPUT_VEH_CIN_CAM~ ");//R~ ");//B
-            ControlList.Add(" ~INPUT_VEH_NEXT_RADIO~ ");//.~ ");//(NONE);
-            ControlList.Add(" ~INPUT_VEH_PREV_RADIO~ ");//,~ ");//(NONE);
-            ControlList.Add(" ~INPUT_VEH_NEXT_RADIO_TRACK~ ");//=~ ");//(NONE);
-            ControlList.Add(" ~INPUT_VEH_PREV_RADIO_TRACK~ ");//-~ ");//(NONE);
-            ControlList.Add(" ~INPUT_VEH_RADIO_WHEEL~ ");//Q~ ");//DPAD LEFT
-            ControlList.Add(" ~INPUT_VEH_HORN~ ");//E~ ");//L3
-            ControlList.Add(" ~INPUT_VEH_FLY_THROTTLE_UP~ ");//W~ ");//RT
-            ControlList.Add(" ~INPUT_VEH_FLY_THROTTLE_DOWN~ ");//S~ ");//LT
-            ControlList.Add(" ~INPUT_VEH_FLY_YAW_LEFT~ ");//A~ ");//LB
-            ControlList.Add(" ~INPUT_VEH_FLY_YAW_RIGHT~ ");//D~ ");//RB
-            ControlList.Add(" ~INPUT_VEH_PASSENGER_AIM~ ");//RIGHT MOUSE BUTTON~ ");//LT
-            ControlList.Add(" ~INPUT_VEH_PASSENGER_ATTACK~ ");//LEFT MOUSE BUTTON~ ");//RT
-            ControlList.Add(" ~INPUT_VEH_SPECIAL_ABILITY_FRANKLIN~ ");//(NONE);~ ");//R3
-            ControlList.Add(" ~INPUT_VEH_STUNT_UD~ ");//(NONE);~ ");//(NONE);
-            ControlList.Add(" ~INPUT_VEH_CINEMATIC_UD~ ");//MOUSE DOWN~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_VEH_CINEMATIC_UP_ONLY~ ");//NUMPAD- / SCROLLWHEEL UP~ ");//(NONE);
-            ControlList.Add(" ~INPUT_VEH_CINEMATIC_DOWN_ONLY~ ");//NUMPAD+ / SCROLLWHEEL DOWN~ ");//(NONE);
-            ControlList.Add(" ~INPUT_VEH_CINEMATIC_LR~ ");//MOUSE RIGHT~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_VEH_SELECT_NEXT_WEAPON~ ");//SCROLLWHEEL UP~ ");//X
-            ControlList.Add(" ~INPUT_VEH_SELECT_PREV_WEAPON~ ");//[~ ");//(NONE);
-            ControlList.Add(" ~INPUT_VEH_ROOF~ ");//H~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_VEH_JUMP~ ");//SPACEBAR~ ");//RB
-            ControlList.Add(" ~INPUT_VEH_GRAPPLING_HOOK~ ");//E~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_VEH_SHUFFLE~ ");//H~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_VEH_DROP_PROJECTILE~ ");//X~ ");//A
-            ControlList.Add(" ~INPUT_VEH_MOUSE_CONTROL_OVERRIDE~ ");//LEFT MOUSE BUTTON~ ");//(NONE);
-            ControlList.Add(" ~INPUT_VEH_FLY_ROLL_LR~ ");//NUMPAD 6~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_FLY_ROLL_LEFT_ONLY~ ");//NUMPAD 4~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_FLY_ROLL_RIGHT_ONLY~ ");//NUMPAD 6~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_FLY_PITCH_UD~ ");//NUMPAD 5~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_FLY_PITCH_UP_ONLY~ ");//NUMPAD 8~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_FLY_PITCH_DOWN_ONLY~ ");//NUMPAD 5~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_FLY_UNDERCARRIAGE~ ");//G~ ");//L3
-            ControlList.Add(" ~INPUT_VEH_FLY_ATTACK~ ");//RIGHT MOUSE BUTTON~ ");//A
-            ControlList.Add(" ~INPUT_VEH_FLY_SELECT_NEXT_WEAPON~ ");//SCROLLWHEEL UP~ ");//DPAD LEFT
-            ControlList.Add(" ~INPUT_VEH_FLY_SELECT_PREV_WEAPON~ ");//[~ ");//(NONE);
-            ControlList.Add(" ~INPUT_VEH_FLY_SELECT_TARGET_LEFT~ ");//NUMPAD 7~ ");//LB
-            ControlList.Add(" ~INPUT_VEH_FLY_SELECT_TARGET_RIGHT~ ");//NUMPAD 9~ ");//RB
-            ControlList.Add(" ~INPUT_VEH_FLY_VERTICAL_FLIGHT_MODE~ ");//E~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_VEH_FLY_DUCK~ ");//X~ ");//A
-            ControlList.Add(" ~INPUT_VEH_FLY_ATTACK_CAMERA~ ");//INSERT~ ");//R3
-            ControlList.Add(" ~INPUT_VEH_FLY_MOUSE_CONTROL_OVERRIDE~ ");//LEFT MOUSE BUTTON~ ");//(NONE);
-            ControlList.Add(" ~INPUT_VEH_SUB_TURN_LR~ ");//NUMPAD 6~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_SUB_TURN_LEFT_ONLY~ ");//NUMPAD 4~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_SUB_TURN_RIGHT_ONLY~ ");//NUMPAD 6~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_SUB_PITCH_UD~ ");//NUMPAD 5~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_SUB_PITCH_UP_ONLY~ ");//NUMPAD 8~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_SUB_PITCH_DOWN_ONLY~ ");//NUMPAD 5~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_SUB_THROTTLE_UP~ ");//W~ ");//RT
-            ControlList.Add(" ~INPUT_VEH_SUB_THROTTLE_DOWN~ ");//S~ ");//LT
-            ControlList.Add(" ~INPUT_VEH_SUB_ASCEND~ ");//LEFT SHIFT~ ");//X
-            ControlList.Add(" ~INPUT_VEH_SUB_DESCEND~ ");//LEFT CTRL~ ");//A
-            ControlList.Add(" ~INPUT_VEH_SUB_TURN_HARD_LEFT~ ");//A~ ");//LB
-            ControlList.Add(" ~INPUT_VEH_SUB_TURN_HARD_RIGHT~ ");//D~ ");//RB
-            ControlList.Add(" ~INPUT_VEH_SUB_MOUSE_CONTROL_OVERRIDE~ ");//LEFT MOUSE BUTTON~ ");//(NONE);
-            ControlList.Add(" ~INPUT_VEH_PUSHBIKE_PEDAL~ ");//W~ ");//A
-            ControlList.Add(" ~INPUT_VEH_PUSHBIKE_SPRINT~ ");//CAPSLOCK~ ");//A
-            ControlList.Add(" ~INPUT_VEH_PUSHBIKE_FRONT_BRAKE~ ");//Q~ ");//LT
-            ControlList.Add(" ~INPUT_VEH_PUSHBIKE_REAR_BRAKE~ ");//S~ ");//RT
-            ControlList.Add(" ~INPUT_MELEE_ATTACK_LIGHT~ ");//R~ ");//B
-            ControlList.Add(" ~INPUT_MELEE_ATTACK_HEAVY~ ");//Q~ ");//A
-            ControlList.Add(" ~INPUT_MELEE_ATTACK_ALTERNATE~ ");//LEFT MOUSE BUTTON~ ");//RT
-            ControlList.Add(" ~INPUT_MELEE_BLOCK~ ");//SPACEBAR~ ");//X
-            ControlList.Add(" ~INPUT_PARACHUTE_DEPLOY~ ");//F / LEFT MOUSE BUTTON~ ");//Y
-            ControlList.Add(" ~INPUT_PARACHUTE_DETACH~ ");//F~ ");//Y
-            ControlList.Add(" ~INPUT_PARACHUTE_TURN_LR~ ");//D~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_PARACHUTE_TURN_LEFT_ONLY~ ");//A~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_PARACHUTE_TURN_RIGHT_ONLY~ ");//D~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_PARACHUTE_PITCH_UD~ ");//S~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_PARACHUTE_PITCH_UP_ONLY~ ");//W~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_PARACHUTE_PITCH_DOWN_ONLY~ ");//S~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_PARACHUTE_BRAKE_LEFT~ ");//Q~ ");//LB
-            ControlList.Add(" ~INPUT_PARACHUTE_BRAKE_RIGHT~ ");//E~ ");//RB
-            ControlList.Add(" ~INPUT_PARACHUTE_SMOKE~ ");//X~ ");//A
-            ControlList.Add(" ~INPUT_PARACHUTE_PRECISION_LANDING~ ");//LEFT SHIFT~ ");//(NONE);
-            ControlList.Add(" ~INPUT_MAP~ ");//(NONE);~ ");//(NONE);
-            ControlList.Add(" ~INPUT_SELECT_WEAPON_UNARMED~ ");//1~ ");//(NONE);
-            ControlList.Add(" ~INPUT_SELECT_WEAPON_MELEE~ ");//2~ ");//(NONE);
-            ControlList.Add(" ~INPUT_SELECT_WEAPON_HANDGUN~ ");//6~ ");//(NONE);
-            ControlList.Add(" ~INPUT_SELECT_WEAPON_SHOTGUN~ ");//3~ ");//(NONE);
-            ControlList.Add(" ~INPUT_SELECT_WEAPON_SMG~ ");//7~ ");//(NONE);
-            ControlList.Add(" ~INPUT_SELECT_WEAPON_AUTO_RIFLE~ ");//8~ ");//(NONE);
-            ControlList.Add(" ~INPUT_SELECT_WEAPON_SNIPER~ ");//9~ ");//(NONE);
-            ControlList.Add(" ~INPUT_SELECT_WEAPON_HEAVY~ ");//4~ ");//(NONE);
-            ControlList.Add(" ~INPUT_SELECT_WEAPON_SPECIAL~ ");//5~ ");//(NONE);
-            ControlList.Add(" ~INPUT_SELECT_CHARACTER_MICHAEL~ ");//F5~ ");//(NONE);
-            ControlList.Add(" ~INPUT_SELECT_CHARACTER_FRANKLIN~ ");//F6~ ");//(NONE);
-            ControlList.Add(" ~INPUT_SELECT_CHARACTER_TREVOR~ ");//F7~ ");//(NONE);
-            ControlList.Add(" ~INPUT_SELECT_CHARACTER_MULTIPLAYER~ ");//F8 (CONSOLE);~ ");//(NONE);
-            ControlList.Add(" ~INPUT_SAVE_REPLAY_CLIP~ ");//F3~ ");//B
-            ControlList.Add(" ~INPUT_SPECIAL_ABILITY_PC~ ");//CAPSLOCK~ ");//(NONE);
-            ControlList.Add(" ~INPUT_CELLPHONE_UP~ ");//ARROW UP~ ");//DPAD UP
-            ControlList.Add(" ~INPUT_CELLPHONE_DOWN~ ");//ARROW DOWN~ ");//DPAD DOWN
-            ControlList.Add(" ~INPUT_CELLPHONE_LEFT~ ");//ARROW LEFT~ ");//DPAD LEFT
-            ControlList.Add(" ~INPUT_CELLPHONE_RIGHT~ ");//ARROW RIGHT~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_CELLPHONE_SELECT~ ");//ENTER / LEFT MOUSE BUTTON~ ");//A
-            ControlList.Add(" ~INPUT_CELLPHONE_CANCEL~ ");//BACKSPACE / ESC / RIGHT MOUSE BUTTON~ ");//B
-            ControlList.Add(" ~INPUT_CELLPHONE_OPTION~ ");//DELETE~ ");//Y
-            ControlList.Add(" ~INPUT_CELLPHONE_EXTRA_OPTION~ ");//SPACEBAR~ ");//X
-            ControlList.Add(" ~INPUT_CELLPHONE_SCROLL_FORWARD~ ");//SCROLLWHEEL DOWN~ ");//(NONE);
-            ControlList.Add(" ~INPUT_CELLPHONE_SCROLL_BACKWARD~ ");//SCROLLWHEEL UP~ ");//(NONE);
-            ControlList.Add(" ~INPUT_CELLPHONE_CAMERA_FOCUS_LOCK~ ");//L~ ");//RT
-            ControlList.Add(" ~INPUT_CELLPHONE_CAMERA_GRID~ ");//G~ ");//RB
-            ControlList.Add(" ~INPUT_CELLPHONE_CAMERA_SELFIE~ ");//E~ ");//R3
-            ControlList.Add(" ~INPUT_CELLPHONE_CAMERA_DOF~ ");//F~ ");//LB
-            ControlList.Add(" ~INPUT_CELLPHONE_CAMERA_EXPRESSION~ ");//X~ ");//L3
-            ControlList.Add(" ~INPUT_FRONTEND_DOWN~ ");//ARROW DOWN~ ");//DPAD DOWN
-            ControlList.Add(" ~INPUT_FRONTEND_UP~ ");//ARROW UP~ ");//DPAD UP
-            ControlList.Add(" ~INPUT_FRONTEND_LEFT~ ");//ARROW LEFT~ ");//DPAD LEFT
-            ControlList.Add(" ~INPUT_FRONTEND_RIGHT~ ");//ARROW RIGHT~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_FRONTEND_RDOWN~ ");//ENTER~ ");//A
-            ControlList.Add(" ~INPUT_FRONTEND_RUP~ ");//TAB~ ");//Y
-            ControlList.Add(" ~INPUT_FRONTEND_RLEFT~ ");//(NONE);~ ");//X
-            ControlList.Add(" ~INPUT_FRONTEND_RRIGHT~ ");//BACKSPACE~ ");//B
-            ControlList.Add(" ~INPUT_FRONTEND_AXIS_X~ ");//D~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_FRONTEND_AXIS_Y~ ");//S~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_FRONTEND_RIGHT_AXIS_X~ ");//]~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_FRONTEND_RIGHT_AXIS_Y~ ");//SCROLLWHEEL DOWN~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_FRONTEND_PAUSE~ ");//P~ ");//START
-            ControlList.Add(" ~INPUT_FRONTEND_PAUSE_ALTERNATE~ ");//ESC~ ");//(NONE);
-            ControlList.Add(" ~INPUT_FRONTEND_ACCEPT~ ");//ENTER / NUMPAD ENTER~ ");//A
-            ControlList.Add(" ~INPUT_FRONTEND_CANCEL~ ");//BACKSPACE / ESC~ ");//B
-            ControlList.Add(" ~INPUT_FRONTEND_X~ ");//SPACEBAR~ ");//X
-            ControlList.Add(" ~INPUT_FRONTEND_Y~ ");//TAB~ ");//Y
-            ControlList.Add(" ~INPUT_FRONTEND_LB~ ");//Q~ ");//LB
-            ControlList.Add(" ~INPUT_FRONTEND_RB~ ");//E~ ");//RB
-            ControlList.Add(" ~INPUT_FRONTEND_LT~ ");//PAGE DOWN~ ");//LT
-            ControlList.Add(" ~INPUT_FRONTEND_RT~ ");//PAGE UP~ ");//RT
-            ControlList.Add(" ~INPUT_FRONTEND_LS~ ");//LEFT SHIFT~ ");//L3
-            ControlList.Add(" ~INPUT_FRONTEND_RS~ ");//LEFT CONTROL~ ");//R3
-            ControlList.Add(" ~INPUT_FRONTEND_LEADERBOARD~ ");//TAB~ ");//RB
-            ControlList.Add(" ~INPUT_FRONTEND_SOCIAL_CLUB~ ");//HOME~ ");//BACK
-            ControlList.Add(" ~INPUT_FRONTEND_SOCIAL_CLUB_SECONDARY~ ");//HOME~ ");//RB
-            ControlList.Add(" ~INPUT_FRONTEND_DELETE~ ");//DELETE~ ");//X
-            ControlList.Add(" ~INPUT_FRONTEND_ENDSCREEN_ACCEPT~ ");//ENTER~ ");//A
-            ControlList.Add(" ~INPUT_FRONTEND_ENDSCREEN_EXPAND~ ");//SPACEBAR~ ");//X
-            ControlList.Add(" ~INPUT_FRONTEND_SELECT~ ");//CAPSLOCK~ ");//BACK
-            ControlList.Add(" ~INPUT_SCRIPT_LEFT_AXIS_X~ ");//D~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_SCRIPT_LEFT_AXIS_Y~ ");//S~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_SCRIPT_RIGHT_AXIS_X~ ");//MOUSE RIGHT~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_SCRIPT_RIGHT_AXIS_Y~ ");//MOUSE DOWN~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_SCRIPT_RUP~ ");//RIGHT MOUSE BUTTON~ ");//Y
-            ControlList.Add(" ~INPUT_SCRIPT_RDOWN~ ");//LEFT MOUSE BUTTON~ ");//A
-            ControlList.Add(" ~INPUT_SCRIPT_RLEFT~ ");//LEFT CTRL~ ");//X
-            ControlList.Add(" ~INPUT_SCRIPT_RRIGHT~ ");//RIGHT MOUSE BUTTON~ ");//B
-            ControlList.Add(" ~INPUT_SCRIPT_LB~ ");//(NONE);~ ");//LB
-            ControlList.Add(" ~INPUT_SCRIPT_RB~ ");//(NONE);~ ");//RB
-            ControlList.Add(" ~INPUT_SCRIPT_LT~ ");//(NONE);~ ");//LT
-            ControlList.Add(" ~INPUT_SCRIPT_RT~ ");//LEFT MOUSE BUTTON~ ");//RT
-            ControlList.Add(" ~INPUT_SCRIPT_LS~ ");//(NONE);~ ");//L3
-            ControlList.Add(" ~INPUT_SCRIPT_RS~ ");//(NONE);~ ");//R3
-            ControlList.Add(" ~INPUT_SCRIPT_PAD_UP~ ");//W~ ");//DPAD UP
-            ControlList.Add(" ~INPUT_SCRIPT_PAD_DOWN~ ");//S~ ");//DPAD DOWN
-            ControlList.Add(" ~INPUT_SCRIPT_PAD_LEFT~ ");//A~ ");//DPAD LEFT
-            ControlList.Add(" ~INPUT_SCRIPT_PAD_RIGHT~ ");//D~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_SCRIPT_SELECT~ ");//V~ ");//BACK
-            ControlList.Add(" ~INPUT_CURSOR_ACCEPT~ ");//LEFT MOUSE BUTTON~ ");//(NONE);
-            ControlList.Add(" ~INPUT_CURSOR_CANCEL~ ");//RIGHT MOUSE BUTTON~ ");//(NONE);
-            ControlList.Add(" ~INPUT_CURSOR_X~ ");//(NONE);~ ");//(NONE);
-            ControlList.Add(" ~INPUT_CURSOR_Y~ ");//(NONE);~ ");//(NONE);
-            ControlList.Add(" ~INPUT_CURSOR_SCROLL_UP~ ");//SCROLLWHEEL UP~ ");//(NONE);
-            ControlList.Add(" ~INPUT_CURSOR_SCROLL_DOWN~ ");//SCROLLWHEEL DOWN~ ");//(NONE);
-            ControlList.Add(" ~INPUT_ENTER_CHEAT_CODE~ ");//~ / `~ ");//(NONE);
-            ControlList.Add(" ~INPUT_INTERACTION_MENU~ ");//M~ ");//BACK
-            ControlList.Add(" ~INPUT_MP_TEXT_CHAT_ALL~ ");//T~ ");//(NONE);
-            ControlList.Add(" ~INPUT_MP_TEXT_CHAT_TEAM~ ");//Y~ ");//(NONE);
-            ControlList.Add(" ~INPUT_MP_TEXT_CHAT_FRIENDS~ ");//(NONE);~ ");//(NONE);
-            ControlList.Add(" ~INPUT_MP_TEXT_CHAT_CREW~ ");//(NONE);~ ");//(NONE);
-            ControlList.Add(" ~INPUT_PUSH_TO_TALK~ ");//N~ ");//(NONE);
-            ControlList.Add(" ~INPUT_CREATOR_LS~ ");//R~ ");//L3
-            ControlList.Add(" ~INPUT_CREATOR_RS~ ");//F~ ");//R3
-            ControlList.Add(" ~INPUT_CREATOR_LT~ ");//X~ ");//LT
-            ControlList.Add(" ~INPUT_CREATOR_RT~ ");//C~ ");//RT
-            ControlList.Add(" ~INPUT_CREATOR_MENU_TOGGLE~ ");//LEFT SHIFT~ ");//(NONE);
-            ControlList.Add(" ~INPUT_CREATOR_ACCEPT~ ");//SPACEBAR~ ");//A
-            ControlList.Add(" ~INPUT_CREATOR_DELETE~ ");//DELETE~ ");//X
-            ControlList.Add(" ~INPUT_ATTACK2~ ");//LEFT MOUSE BUTTON~ ");//RT
-            ControlList.Add(" ~INPUT_RAPPEL_JUMP~ ");//(NONE);~ ");//A
-            ControlList.Add(" ~INPUT_RAPPEL_LONG_JUMP~ ");//(NONE);~ ");//X
-            ControlList.Add(" ~INPUT_RAPPEL_SMASH_WINDOW~ ");//(NONE);~ ");//RT
-            ControlList.Add(" ~INPUT_PREV_WEAPON~ ");//SCROLLWHEEL UP~ ");//DPAD LEFT
-            ControlList.Add(" ~INPUT_NEXT_WEAPON~ ");//SCROLLWHEEL DOWN~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_MELEE_ATTACK1~ ");//R~ ");//B
-            ControlList.Add(" ~INPUT_MELEE_ATTACK2~ ");//Q~ ");//A
-            ControlList.Add(" ~INPUT_WHISTLE~ ");//(NONE);~ ");//(NONE);
-            ControlList.Add(" ~INPUT_MOVE_LEFT~ ");//D~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_MOVE_RIGHT~ ");//D~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_MOVE_UP~ ");//S~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_MOVE_DOWN~ ");//S~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_LOOK_LEFT~ ");//MOUSE RIGHT~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_LOOK_RIGHT~ ");//MOUSE RIGHT~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_LOOK_UP~ ");//MOUSE DOWN~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_LOOK_DOWN~ ");//MOUSE DOWN~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_SNIPER_ZOOM_IN~ ");//[~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_SNIPER_ZOOM_OUT~ ");//[~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_SNIPER_ZOOM_IN_ALTERNATE~ ");//[~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_SNIPER_ZOOM_OUT_ALTERNATE~ ");//[~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_MOVE_LEFT~ ");//D~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_MOVE_RIGHT~ ");//D~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_MOVE_UP~ ");//LEFT CTRL~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_MOVE_DOWN~ ");//LEFT CTRL~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_GUN_LEFT~ ");//MOUSE RIGHT~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_VEH_GUN_RIGHT~ ");//MOUSE RIGHT~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_VEH_GUN_UP~ ");//MOUSE RIGHT~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_VEH_GUN_DOWN~ ");//MOUSE RIGHT~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_VEH_LOOK_LEFT~ ");//MOUSE RIGHT~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_VEH_LOOK_RIGHT~ ");//MOUSE RIGHT~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_REPLAY_START_STOP_RECORDING~ ");//F1~ ");//A
-            ControlList.Add(" ~INPUT_REPLAY_START_STOP_RECORDING_SECONDARY~ ");//F2~ ");//X
-            ControlList.Add(" ~INPUT_SCALED_LOOK_LR~ ");//MOUSE RIGHT~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_SCALED_LOOK_UD~ ");//MOUSE DOWN~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_SCALED_LOOK_UP_ONLY~ ");//(NONE);~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_SCALED_LOOK_DOWN_ONLY~ ");//(NONE);~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_SCALED_LOOK_LEFT_ONLY~ ");//(NONE);~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_SCALED_LOOK_RIGHT_ONLY~ ");//(NONE);~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_REPLAY_MARKER_DELETE~ ");//DELETE~ ");//X
-            ControlList.Add(" ~INPUT_REPLAY_CLIP_DELETE~ ");//DELETE~ ");//Y
-            ControlList.Add(" ~INPUT_REPLAY_PAUSE~ ");//SPACEBAR~ ");//A
-            ControlList.Add(" ~INPUT_REPLAY_REWIND~ ");//ARROW DOWN~ ");//LB
-            ControlList.Add(" ~INPUT_REPLAY_FFWD~ ");//ARROW UP~ ");//RB
-            ControlList.Add(" ~INPUT_REPLAY_NEWMARKER~ ");//M~ ");//A
-            ControlList.Add(" ~INPUT_REPLAY_RECORD~ ");//S~ ");//(NONE);
-            ControlList.Add(" ~INPUT_REPLAY_SCREENSHOT~ ");//U~ ");//DPAD UP
-            ControlList.Add(" ~INPUT_REPLAY_HIDEHUD~ ");//H~ ");//R3
-            ControlList.Add(" ~INPUT_REPLAY_STARTPOINT~ ");//B~ ");//(NONE);
-            ControlList.Add(" ~INPUT_REPLAY_ENDPOINT~ ");//N~ ");//(NONE);
-            ControlList.Add(" ~INPUT_REPLAY_ADVANCE~ ");//ARROW RIGHT~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_REPLAY_BACK~ ");//ARROW LEFT~ ");//DPAD LEFT
-            ControlList.Add(" ~INPUT_REPLAY_TOOLS~ ");//T~ ");//DPAD DOWN
-            ControlList.Add(" ~INPUT_REPLAY_RESTART~ ");//R~ ");//BACK
-            ControlList.Add(" ~INPUT_REPLAY_SHOWHOTKEY~ ");//K~ ");//DPAD DOWN
-            ControlList.Add(" ~INPUT_REPLAY_CYCLEMARKERLEFT~ ");//[~ ");//DPAD LEFT
-            ControlList.Add(" ~INPUT_REPLAY_CYCLEMARKERRIGHT~ ");//]~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_REPLAY_FOVINCREASE~ ");//NUMPAD +~ ");//RB
-            ControlList.Add(" ~INPUT_REPLAY_FOVDECREASE~ ");//NUMPAD -~ ");//LB
-            ControlList.Add(" ~INPUT_REPLAY_CAMERAUP~ ");//PAGE UP~ ");//(NONE);
-            ControlList.Add(" ~INPUT_REPLAY_CAMERADOWN~ ");//PAGE DOWN~ ");//(NONE);
-            ControlList.Add(" ~INPUT_REPLAY_SAVE~ ");//F5~ ");//START
-            ControlList.Add(" ~INPUT_REPLAY_TOGGLETIME~ ");//C~ ");//(NONE);
-            ControlList.Add(" ~INPUT_REPLAY_TOGGLETIPS~ ");//V~ ");//(NONE);
-            ControlList.Add(" ~INPUT_REPLAY_PREVIEW~ ");//SPACEBAR~ ");//(NONE);
-            ControlList.Add(" ~INPUT_REPLAY_TOGGLE_TIMELINE~ ");//ESC~ ");//(NONE);
-            ControlList.Add(" ~INPUT_REPLAY_TIMELINE_PICKUP_CLIP~ ");//X~ ");//(NONE);
-            ControlList.Add(" ~INPUT_REPLAY_TIMELINE_DUPLICATE_CLIP~ ");//C~ ");//(NONE);
-            ControlList.Add(" ~INPUT_REPLAY_TIMELINE_PLACE_CLIP~ ");//V~ ");//(NONE);
-            ControlList.Add(" ~INPUT_REPLAY_CTRL~ ");//LEFT CTRL~ ");//(NONE);
-            ControlList.Add(" ~INPUT_REPLAY_TIMELINE_SAVE~ ");//F5~ ");//(NONE);
-            ControlList.Add(" ~INPUT_REPLAY_PREVIEW_AUDIO~ ");//SPACEBAR~ ");//RT
-            ControlList.Add(" ~INPUT_VEH_DRIVE_LOOK~ ");//LEFT MOUSE BUTTON~ ");//(NONE);
-            ControlList.Add(" ~INPUT_VEH_DRIVE_LOOK2~ ");//RIGHT MOUSE BUTTON~ ");//(NONE);
-            ControlList.Add(" ~INPUT_VEH_FLY_ATTACK2~ ");//RIGHT MOUSE BUTTON~ ");//(NONE);
-            ControlList.Add(" ~INPUT_RADIO_WHEEL_UD~ ");//MOUSE DOWN~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_RADIO_WHEEL_LR~ ");//MOUSE RIGHT~ ");//RIGHT STICK
-            ControlList.Add(" ~INPUT_VEH_SLOWMO_UD~ ");//SCROLLWHEEL DOWN~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_SLOWMO_UP_ONLY~ ");//SCROLLWHEEL UP~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_SLOWMO_DOWN_ONLY~ ");//SCROLLWHEEL DOWN~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_HYDRAULICS_CONTROL_TOGGLE~ ");//X~ ");//A
-            ControlList.Add(" ~INPUT_VEH_HYDRAULICS_CONTROL_LEFT~ ");//A~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_HYDRAULICS_CONTROL_RIGHT~ ");//D~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_HYDRAULICS_CONTROL_UP~ ");//LEFT SHIFT~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_HYDRAULICS_CONTROL_DOWN~ ");//LEFT CTRL~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_HYDRAULICS_CONTROL_UD~ ");//D~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_VEH_HYDRAULICS_CONTROL_LR~ ");//LEFT CTRL~ ");//LEFT STICK
-            ControlList.Add(" ~INPUT_SWITCH_VISOR~ ");//F11~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_VEH_MELEE_HOLD~ ");//X~ ");//A
-            ControlList.Add(" ~INPUT_VEH_MELEE_LEFT~ ");//LEFT MOUSE BUTTON~ ");//LB
-            ControlList.Add(" ~INPUT_VEH_MELEE_RIGHT~ ");//RIGHT MOUSE BUTTON~ ");//RB
-            ControlList.Add(" ~INPUT_MAP_POI~ ");//SCROLLWHEEL BUTTON (PRESS);~ ");//Y
-            ControlList.Add(" ~INPUT_REPLAY_SNAPMATIC_PHOTO~ ");//TAB~ ");//X
-            ControlList.Add(" ~INPUT_VEH_CAR_JUMP~ ");//E~ ");//L3
-            ControlList.Add(" ~INPUT_VEH_ROCKET_BOOST~ ");//E~ ");//L3
-            ControlList.Add(" ~INPUT_VEH_FLY_BOOST~ ");//LEFT SHIFT~ ");//L3
-            ControlList.Add(" ~INPUT_VEH_PARACHUTE~ ");//SPACEBAR~ ");//A
-            ControlList.Add(" ~INPUT_VEH_BIKE_WINGS~ ");//X~ ");//A
-            ControlList.Add(" ~INPUT_VEH_FLY_BOMB_BAY~ ");//E~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_VEH_FLY_COUNTER~ ");//E~ ");//DPAD RIGHT
-            ControlList.Add(" ~INPUT_VEH_TRANSFORM~ ");//X~ ");//A
-            ControlList.Add(" ~INPUT_QUAD_LOCO_REVERSE~ ");//~ ");//RB
-            ControlList.Add(" ~INPUT_RESPAWN_FASTER~ ");//~ ");//
-            ControlList.Add(" ~INPUT_HUDMARKER_SELECT~ ");
+            List<string> ControlList = new List<string>
+            {
+                " ~INPUT_NEXT_CAMERA~ ",//V~ ");//BACK
+                " ~INPUT_LOOK_LR~ ",//MOUSE RIGHT~ ");//RIGHT STICK
+                " ~INPUT_LOOK_UD~ ",//MOUSE DOWN~ ");//RIGHT STICK
+                " ~INPUT_LOOK_UP_ONLY~ ",//(NONE);~ ");//RIGHT STICK
+                " ~INPUT_LOOK_DOWN_ONLY~ ",//MOUSE DOWN~ ");//RIGHT STICK
+                " ~INPUT_LOOK_LEFT_ONLY~ ",//(NONE);~ ");//RIGHT STICK
+                " ~INPUT_LOOK_RIGHT_ONLY~ ",//MOUSE RIGHT~ ");//RIGHT STICK
+                " ~INPUT_CINEMATIC_SLOWMO~ ",//(NONE);~ ");//R3
+                " ~INPUT_SCRIPTED_FLY_UD~ ",//S~ ");//LEFT STICK
+                " ~INPUT_SCRIPTED_FLY_LR~ ",//D~ ");//LEFT STICK
+                " ~INPUT_SCRIPTED_FLY_ZUP~ ",//PAGEUP~ ");//LT
+                " ~INPUT_SCRIPTED_FLY_ZDOWN~ ",//PAGEDOWN~ ");//RT
+                " ~INPUT_WEAPON_WHEEL_UD~ ",//MOUSE DOWN~ ");//RIGHT STICK
+                " ~INPUT_WEAPON_WHEEL_LR~ ",//MOUSE RIGHT~ ");//RIGHT STICK
+                " ~INPUT_WEAPON_WHEEL_NEXT~ ",//SCROLLWHEEL DOWN~ ");//DPAD RIGHT
+                " ~INPUT_WEAPON_WHEEL_PREV~ ",//SCROLLWHEEL UP~ ");//DPAD LEFT
+                " ~INPUT_SELECT_NEXT_WEAPON~ ",//SCROLLWHEEL DOWN~ ");//(NONE);
+                " ~INPUT_SELECT_PREV_WEAPON~ ",//SCROLLWHEEL UP~ ");//(NONE);
+                " ~INPUT_SKIP_CUTSCENE~ ",//ENTER / LEFT MOUSE BUTTON / SPACEBAR~ ");//A
+                " ~INPUT_CHARACTER_WHEEL~ ",//LEFT ALT~ ");//DPAD DOWN
+                " ~INPUT_MULTIPLAYER_INFO~ ",//Z~ ");//DPAD DOWN
+                " ~INPUT_SPRINT~ ",//LEFT SHIFT~ ");//A
+                " ~INPUT_JUMP~ ",//SPACEBAR~ ");//X
+                " ~INPUT_ENTER~ ",//F~ ");//Y
+                " ~INPUT_ATTACK~ ",//LEFT MOUSE BUTTON~ ");//RT
+                " ~INPUT_AIM~ ",//RIGHT MOUSE BUTTON~ ");//LT
+                " ~INPUT_LOOK_BEHIND~ ",//C~ ");//R3
+                " ~INPUT_PHONE~ ",//ARROW UP / SCROLLWHEEL BUTTON (PRESS);~ ");//DPAD UP
+                " ~INPUT_SPECIAL_ABILITY~ ",//(NONE);~ ");//L3
+                " ~INPUT_SPECIAL_ABILITY_SECONDARY~ ",//B~ ");//R3
+                " ~INPUT_MOVE_LR~ ",//D~ ");//LEFT STICK
+                " ~INPUT_MOVE_UD~ ",//S~ ");//LEFT STICK
+                " ~INPUT_MOVE_UP_ONLY~ ",//W~ ");//LEFT STICK
+                " ~INPUT_MOVE_DOWN_ONLY~ ",//S~ ");//LEFT STICK
+                " ~INPUT_MOVE_LEFT_ONLY~ ",//A~ ");//LEFT STICK
+                " ~INPUT_MOVE_RIGHT_ONLY~ ",//D~ ");//LEFT STICK
+                " ~INPUT_DUCK~ ",//LEFT CTRL~ ");//L3
+                " ~INPUT_SELECT_WEAPON~ ",//TAB~ ");//LB
+                " ~INPUT_PICKUP~ ",//E~ ");//LB
+                " ~INPUT_SNIPER_ZOOM~ ",//[~ ");//LEFT STICK
+                " ~INPUT_SNIPER_ZOOM_IN_ONLY~ ",//]~ ");//LEFT STICK
+                " ~INPUT_SNIPER_ZOOM_OUT_ONLY~ ",//[~ ");//LEFT STICK
+                " ~INPUT_SNIPER_ZOOM_IN_SECONDARY~ ",//]~ ");//DPAD UP
+                " ~INPUT_SNIPER_ZOOM_OUT_SECONDARY~ ",//[~ ");//DPAD DOWN
+                " ~INPUT_COVER~ ",//Q~ ");//RB
+                " ~INPUT_RELOAD~ ",//R~ ");//B
+                " ~INPUT_TALK~ ",//E~ ");//DPAD RIGHT
+                " ~INPUT_DETONATE~ ",//G~ ");//DPAD LEFT
+                " ~INPUT_HUD_SPECIAL~ ",//Z~ ");//DPAD DOWN
+                " ~INPUT_ARREST~ ",//F~ ");//Y
+                " ~INPUT_ACCURATE_AIM~ ",//SCROLLWHEEL DOWN~ ");//R3
+                " ~INPUT_CONTEXT~ ",//E~ ");//DPAD RIGHT
+                " ~INPUT_CONTEXT_SECONDARY~ ",//Q~ ");//DPAD LEFT
+                " ~INPUT_WEAPON_SPECIAL~ ",//(NONE);~ ");//Y
+                " ~INPUT_WEAPON_SPECIAL_TWO~ ",//E~ ");//DPAD RIGHT
+                " ~INPUT_DIVE~ ",//SPACEBAR~ ");//RB
+                " ~INPUT_DROP_WEAPON~ ",//F9~ ");//Y
+                " ~INPUT_DROP_AMMO~ ",//F10~ ");//B
+                " ~INPUT_THROW_GRENADE~ ",//G~ ");//DPAD LEFT
+                " ~INPUT_VEH_MOVE_LR~ ",//D~ ");//LEFT STICK
+                " ~INPUT_VEH_MOVE_UD~ ",//LEFT CTRL~ ");//LEFT STICK
+                " ~INPUT_VEH_MOVE_UP_ONLY~ ",//LEFT SHIFT~ ");//LEFT STICK
+                " ~INPUT_VEH_MOVE_DOWN_ONLY~ ",//LEFT CTRL~ ");//LEFT STICK
+                " ~INPUT_VEH_MOVE_LEFT_ONLY~ ",//A~ ");//LEFT STICK
+                " ~INPUT_VEH_MOVE_RIGHT_ONLY~ ",//D~ ");//LEFT STICK
+                " ~INPUT_VEH_SPECIAL~ ",//(NONE);~ ");//(NONE);
+                " ~INPUT_VEH_GUN_LR~ ",//MOUSE RIGHT~ ");//RIGHT STICK
+                " ~INPUT_VEH_GUN_UD~ ",//MOUSE DOWN~ ");//RIGHT STICK
+                " ~INPUT_VEH_AIM~ ",//RIGHT MOUSE BUTTON~ ");//LB
+                " ~INPUT_VEH_ATTACK~ ",//LEFT MOUSE BUTTON~ ");//RB
+                " ~INPUT_VEH_ATTACK2~ ",//RIGHT MOUSE BUTTON~ ");//A
+                " ~INPUT_VEH_ACCELERATE~ ",//W~ ");//RT
+                " ~INPUT_VEH_BRAKE~ ",//S~ ");//LT
+                " ~INPUT_VEH_DUCK~ ",//X~ ");//A
+                " ~INPUT_VEH_HEADLIGHT~ ",//H~ ");//DPAD RIGHT
+                " ~INPUT_VEH_EXIT~ ",//F~ ");//Y
+                " ~INPUT_VEH_HANDBRAKE~ ",//SPACEBAR~ ");//RB
+                " ~INPUT_VEH_HOTWIRE_LEFT~ ",//W~ ");//LT
+                " ~INPUT_VEH_HOTWIRE_RIGHT~ ",//S~ ");//RT
+                " ~INPUT_VEH_LOOK_BEHIND~ ",//C~ ");//R3
+                " ~INPUT_VEH_CIN_CAM~ ",//R~ ");//B
+                " ~INPUT_VEH_NEXT_RADIO~ ",//.~ ");//(NONE);
+                " ~INPUT_VEH_PREV_RADIO~ ",//,~ ");//(NONE);
+                " ~INPUT_VEH_NEXT_RADIO_TRACK~ ",//=~ ");//(NONE);
+                " ~INPUT_VEH_PREV_RADIO_TRACK~ ",//-~ ");//(NONE);
+                " ~INPUT_VEH_RADIO_WHEEL~ ",//Q~ ");//DPAD LEFT
+                " ~INPUT_VEH_HORN~ ",//E~ ");//L3
+                " ~INPUT_VEH_FLY_THROTTLE_UP~ ",//W~ ");//RT
+                " ~INPUT_VEH_FLY_THROTTLE_DOWN~ ",//S~ ");//LT
+                " ~INPUT_VEH_FLY_YAW_LEFT~ ",//A~ ");//LB
+                " ~INPUT_VEH_FLY_YAW_RIGHT~ ",//D~ ");//RB
+                " ~INPUT_VEH_PASSENGER_AIM~ ",//RIGHT MOUSE BUTTON~ ");//LT
+                " ~INPUT_VEH_PASSENGER_ATTACK~ ",//LEFT MOUSE BUTTON~ ");//RT
+                " ~INPUT_VEH_SPECIAL_ABILITY_FRANKLIN~ ",//(NONE);~ ");//R3
+                " ~INPUT_VEH_STUNT_UD~ ",//(NONE);~ ");//(NONE);
+                " ~INPUT_VEH_CINEMATIC_UD~ ",//MOUSE DOWN~ ");//RIGHT STICK
+                " ~INPUT_VEH_CINEMATIC_UP_ONLY~ ",//NUMPAD- / SCROLLWHEEL UP~ ");//(NONE);
+                " ~INPUT_VEH_CINEMATIC_DOWN_ONLY~ ",//NUMPAD+ / SCROLLWHEEL DOWN~ ");//(NONE);
+                " ~INPUT_VEH_CINEMATIC_LR~ ",//MOUSE RIGHT~ ");//RIGHT STICK
+                " ~INPUT_VEH_SELECT_NEXT_WEAPON~ ",//SCROLLWHEEL UP~ ");//X
+                " ~INPUT_VEH_SELECT_PREV_WEAPON~ ",//[~ ");//(NONE);
+                " ~INPUT_VEH_ROOF~ ",//H~ ");//DPAD RIGHT
+                " ~INPUT_VEH_JUMP~ ",//SPACEBAR~ ");//RB
+                " ~INPUT_VEH_GRAPPLING_HOOK~ ",//E~ ");//DPAD RIGHT
+                " ~INPUT_VEH_SHUFFLE~ ",//H~ ");//DPAD RIGHT
+                " ~INPUT_VEH_DROP_PROJECTILE~ ",//X~ ");//A
+                " ~INPUT_VEH_MOUSE_CONTROL_OVERRIDE~ ",//LEFT MOUSE BUTTON~ ");//(NONE);
+                " ~INPUT_VEH_FLY_ROLL_LR~ ",//NUMPAD 6~ ");//LEFT STICK
+                " ~INPUT_VEH_FLY_ROLL_LEFT_ONLY~ ",//NUMPAD 4~ ");//LEFT STICK
+                " ~INPUT_VEH_FLY_ROLL_RIGHT_ONLY~ ",//NUMPAD 6~ ");//LEFT STICK
+                " ~INPUT_VEH_FLY_PITCH_UD~ ",//NUMPAD 5~ ");//LEFT STICK
+                " ~INPUT_VEH_FLY_PITCH_UP_ONLY~ ",//NUMPAD 8~ ");//LEFT STICK
+                " ~INPUT_VEH_FLY_PITCH_DOWN_ONLY~ ",//NUMPAD 5~ ");//LEFT STICK
+                " ~INPUT_VEH_FLY_UNDERCARRIAGE~ ",//G~ ");//L3
+                " ~INPUT_VEH_FLY_ATTACK~ ",//RIGHT MOUSE BUTTON~ ");//A
+                " ~INPUT_VEH_FLY_SELECT_NEXT_WEAPON~ ",//SCROLLWHEEL UP~ ");//DPAD LEFT
+                " ~INPUT_VEH_FLY_SELECT_PREV_WEAPON~ ",//[~ ");//(NONE);
+                " ~INPUT_VEH_FLY_SELECT_TARGET_LEFT~ ",//NUMPAD 7~ ");//LB
+                " ~INPUT_VEH_FLY_SELECT_TARGET_RIGHT~ ",//NUMPAD 9~ ");//RB
+                " ~INPUT_VEH_FLY_VERTICAL_FLIGHT_MODE~ ",//E~ ");//DPAD RIGHT
+                " ~INPUT_VEH_FLY_DUCK~ ",//X~ ");//A
+                " ~INPUT_VEH_FLY_ATTACK_CAMERA~ ",//INSERT~ ");//R3
+                " ~INPUT_VEH_FLY_MOUSE_CONTROL_OVERRIDE~ ",//LEFT MOUSE BUTTON~ ");//(NONE);
+                " ~INPUT_VEH_SUB_TURN_LR~ ",//NUMPAD 6~ ");//LEFT STICK
+                " ~INPUT_VEH_SUB_TURN_LEFT_ONLY~ ",//NUMPAD 4~ ");//LEFT STICK
+                " ~INPUT_VEH_SUB_TURN_RIGHT_ONLY~ ",//NUMPAD 6~ ");//LEFT STICK
+                " ~INPUT_VEH_SUB_PITCH_UD~ ",//NUMPAD 5~ ");//LEFT STICK
+                " ~INPUT_VEH_SUB_PITCH_UP_ONLY~ ",//NUMPAD 8~ ");//LEFT STICK
+                " ~INPUT_VEH_SUB_PITCH_DOWN_ONLY~ ",//NUMPAD 5~ ");//LEFT STICK
+                " ~INPUT_VEH_SUB_THROTTLE_UP~ ",//W~ ");//RT
+                " ~INPUT_VEH_SUB_THROTTLE_DOWN~ ",//S~ ");//LT
+                " ~INPUT_VEH_SUB_ASCEND~ ",//LEFT SHIFT~ ");//X
+                " ~INPUT_VEH_SUB_DESCEND~ ",//LEFT CTRL~ ");//A
+                " ~INPUT_VEH_SUB_TURN_HARD_LEFT~ ",//A~ ");//LB
+                " ~INPUT_VEH_SUB_TURN_HARD_RIGHT~ ",//D~ ");//RB
+                " ~INPUT_VEH_SUB_MOUSE_CONTROL_OVERRIDE~ ",//LEFT MOUSE BUTTON~ ");//(NONE);
+                " ~INPUT_VEH_PUSHBIKE_PEDAL~ ",//W~ ");//A
+                " ~INPUT_VEH_PUSHBIKE_SPRINT~ ",//CAPSLOCK~ ");//A
+                " ~INPUT_VEH_PUSHBIKE_FRONT_BRAKE~ ",//Q~ ");//LT
+                " ~INPUT_VEH_PUSHBIKE_REAR_BRAKE~ ",//S~ ");//RT
+                " ~INPUT_MELEE_ATTACK_LIGHT~ ",//R~ ");//B
+                " ~INPUT_MELEE_ATTACK_HEAVY~ ",//Q~ ");//A
+                " ~INPUT_MELEE_ATTACK_ALTERNATE~ ",//LEFT MOUSE BUTTON~ ");//RT
+                " ~INPUT_MELEE_BLOCK~ ",//SPACEBAR~ ");//X
+                " ~INPUT_PARACHUTE_DEPLOY~ ",//F / LEFT MOUSE BUTTON~ ");//Y
+                " ~INPUT_PARACHUTE_DETACH~ ",//F~ ");//Y
+                " ~INPUT_PARACHUTE_TURN_LR~ ",//D~ ");//LEFT STICK
+                " ~INPUT_PARACHUTE_TURN_LEFT_ONLY~ ",//A~ ");//LEFT STICK
+                " ~INPUT_PARACHUTE_TURN_RIGHT_ONLY~ ",//D~ ");//LEFT STICK
+                " ~INPUT_PARACHUTE_PITCH_UD~ ",//S~ ");//LEFT STICK
+                " ~INPUT_PARACHUTE_PITCH_UP_ONLY~ ",//W~ ");//LEFT STICK
+                " ~INPUT_PARACHUTE_PITCH_DOWN_ONLY~ ",//S~ ");//LEFT STICK
+                " ~INPUT_PARACHUTE_BRAKE_LEFT~ ",//Q~ ");//LB
+                " ~INPUT_PARACHUTE_BRAKE_RIGHT~ ",//E~ ");//RB
+                " ~INPUT_PARACHUTE_SMOKE~ ",//X~ ");//A
+                " ~INPUT_PARACHUTE_PRECISION_LANDING~ ",//LEFT SHIFT~ ");//(NONE);
+                " ~INPUT_MAP~ ",//(NONE);~ ");//(NONE);
+                " ~INPUT_SELECT_WEAPON_UNARMED~ ",//1~ ");//(NONE);
+                " ~INPUT_SELECT_WEAPON_MELEE~ ",//2~ ");//(NONE);
+                " ~INPUT_SELECT_WEAPON_HANDGUN~ ",//6~ ");//(NONE);
+                " ~INPUT_SELECT_WEAPON_SHOTGUN~ ",//3~ ");//(NONE);
+                " ~INPUT_SELECT_WEAPON_SMG~ ",//7~ ");//(NONE);
+                " ~INPUT_SELECT_WEAPON_AUTO_RIFLE~ ",//8~ ");//(NONE);
+                " ~INPUT_SELECT_WEAPON_SNIPER~ ",//9~ ");//(NONE);
+                " ~INPUT_SELECT_WEAPON_HEAVY~ ",//4~ ");//(NONE);
+                " ~INPUT_SELECT_WEAPON_SPECIAL~ ",//5~ ");//(NONE);
+                " ~INPUT_SELECT_CHARACTER_MICHAEL~ ",//F5~ ");//(NONE);
+                " ~INPUT_SELECT_CHARACTER_FRANKLIN~ ",//F6~ ");//(NONE);
+                " ~INPUT_SELECT_CHARACTER_TREVOR~ ",//F7~ ");//(NONE);
+                " ~INPUT_SELECT_CHARACTER_MULTIPLAYER~ ",//F8 (CONSOLE);~ ");//(NONE);
+                " ~INPUT_SAVE_REPLAY_CLIP~ ",//F3~ ");//B
+                " ~INPUT_SPECIAL_ABILITY_PC~ ",//CAPSLOCK~ ");//(NONE);
+                " ~INPUT_CELLPHONE_UP~ ",//ARROW UP~ ");//DPAD UP
+                " ~INPUT_CELLPHONE_DOWN~ ",//ARROW DOWN~ ");//DPAD DOWN
+                " ~INPUT_CELLPHONE_LEFT~ ",//ARROW LEFT~ ");//DPAD LEFT
+                " ~INPUT_CELLPHONE_RIGHT~ ",//ARROW RIGHT~ ");//DPAD RIGHT
+                " ~INPUT_CELLPHONE_SELECT~ ",//ENTER / LEFT MOUSE BUTTON~ ");//A
+                " ~INPUT_CELLPHONE_CANCEL~ ",//BACKSPACE / ESC / RIGHT MOUSE BUTTON~ ");//B
+                " ~INPUT_CELLPHONE_OPTION~ ",//DELETE~ ");//Y
+                " ~INPUT_CELLPHONE_EXTRA_OPTION~ ",//SPACEBAR~ ");//X
+                " ~INPUT_CELLPHONE_SCROLL_FORWARD~ ",//SCROLLWHEEL DOWN~ ");//(NONE);
+                " ~INPUT_CELLPHONE_SCROLL_BACKWARD~ ",//SCROLLWHEEL UP~ ");//(NONE);
+                " ~INPUT_CELLPHONE_CAMERA_FOCUS_LOCK~ ",//L~ ");//RT
+                " ~INPUT_CELLPHONE_CAMERA_GRID~ ",//G~ ");//RB
+                " ~INPUT_CELLPHONE_CAMERA_SELFIE~ ",//E~ ");//R3
+                " ~INPUT_CELLPHONE_CAMERA_DOF~ ",//F~ ");//LB
+                " ~INPUT_CELLPHONE_CAMERA_EXPRESSION~ ",//X~ ");//L3
+                " ~INPUT_FRONTEND_DOWN~ ",//ARROW DOWN~ ");//DPAD DOWN
+                " ~INPUT_FRONTEND_UP~ ",//ARROW UP~ ");//DPAD UP
+                " ~INPUT_FRONTEND_LEFT~ ",//ARROW LEFT~ ");//DPAD LEFT
+                " ~INPUT_FRONTEND_RIGHT~ ",//ARROW RIGHT~ ");//DPAD RIGHT
+                " ~INPUT_FRONTEND_RDOWN~ ",//ENTER~ ");//A
+                " ~INPUT_FRONTEND_RUP~ ",//TAB~ ");//Y
+                " ~INPUT_FRONTEND_RLEFT~ ",//(NONE);~ ");//X
+                " ~INPUT_FRONTEND_RRIGHT~ ",//BACKSPACE~ ");//B
+                " ~INPUT_FRONTEND_AXIS_X~ ",//D~ ");//LEFT STICK
+                " ~INPUT_FRONTEND_AXIS_Y~ ",//S~ ");//LEFT STICK
+                " ~INPUT_FRONTEND_RIGHT_AXIS_X~ ",//]~ ");//RIGHT STICK
+                " ~INPUT_FRONTEND_RIGHT_AXIS_Y~ ",//SCROLLWHEEL DOWN~ ");//RIGHT STICK
+                " ~INPUT_FRONTEND_PAUSE~ ",//P~ ");//START
+                " ~INPUT_FRONTEND_PAUSE_ALTERNATE~ ",//ESC~ ");//(NONE);
+                " ~INPUT_FRONTEND_ACCEPT~ ",//ENTER / NUMPAD ENTER~ ");//A
+                " ~INPUT_FRONTEND_CANCEL~ ",//BACKSPACE / ESC~ ");//B
+                " ~INPUT_FRONTEND_X~ ",//SPACEBAR~ ");//X
+                " ~INPUT_FRONTEND_Y~ ",//TAB~ ");//Y
+                " ~INPUT_FRONTEND_LB~ ",//Q~ ");//LB
+                " ~INPUT_FRONTEND_RB~ ",//E~ ");//RB
+                " ~INPUT_FRONTEND_LT~ ",//PAGE DOWN~ ");//LT
+                " ~INPUT_FRONTEND_RT~ ",//PAGE UP~ ");//RT
+                " ~INPUT_FRONTEND_LS~ ",//LEFT SHIFT~ ");//L3
+                " ~INPUT_FRONTEND_RS~ ",//LEFT CONTROL~ ");//R3
+                " ~INPUT_FRONTEND_LEADERBOARD~ ",//TAB~ ");//RB
+                " ~INPUT_FRONTEND_SOCIAL_CLUB~ ",//HOME~ ");//BACK
+                " ~INPUT_FRONTEND_SOCIAL_CLUB_SECONDARY~ ",//HOME~ ");//RB
+                " ~INPUT_FRONTEND_DELETE~ ",//DELETE~ ");//X
+                " ~INPUT_FRONTEND_ENDSCREEN_ACCEPT~ ",//ENTER~ ");//A
+                " ~INPUT_FRONTEND_ENDSCREEN_EXPAND~ ",//SPACEBAR~ ");//X
+                " ~INPUT_FRONTEND_SELECT~ ",//CAPSLOCK~ ");//BACK
+                " ~INPUT_SCRIPT_LEFT_AXIS_X~ ",//D~ ");//LEFT STICK
+                " ~INPUT_SCRIPT_LEFT_AXIS_Y~ ",//S~ ");//LEFT STICK
+                " ~INPUT_SCRIPT_RIGHT_AXIS_X~ ",//MOUSE RIGHT~ ");//RIGHT STICK
+                " ~INPUT_SCRIPT_RIGHT_AXIS_Y~ ",//MOUSE DOWN~ ");//RIGHT STICK
+                " ~INPUT_SCRIPT_RUP~ ",//RIGHT MOUSE BUTTON~ ");//Y
+                " ~INPUT_SCRIPT_RDOWN~ ",//LEFT MOUSE BUTTON~ ");//A
+                " ~INPUT_SCRIPT_RLEFT~ ",//LEFT CTRL~ ");//X
+                " ~INPUT_SCRIPT_RRIGHT~ ",//RIGHT MOUSE BUTTON~ ");//B
+                " ~INPUT_SCRIPT_LB~ ",//(NONE);~ ");//LB
+                " ~INPUT_SCRIPT_RB~ ",//(NONE);~ ");//RB
+                " ~INPUT_SCRIPT_LT~ ",//(NONE);~ ");//LT
+                " ~INPUT_SCRIPT_RT~ ",//LEFT MOUSE BUTTON~ ");//RT
+                " ~INPUT_SCRIPT_LS~ ",//(NONE);~ ");//L3
+                " ~INPUT_SCRIPT_RS~ ",//(NONE);~ ");//R3
+                " ~INPUT_SCRIPT_PAD_UP~ ",//W~ ");//DPAD UP
+                " ~INPUT_SCRIPT_PAD_DOWN~ ",//S~ ");//DPAD DOWN
+                " ~INPUT_SCRIPT_PAD_LEFT~ ",//A~ ");//DPAD LEFT
+                " ~INPUT_SCRIPT_PAD_RIGHT~ ",//D~ ");//DPAD RIGHT
+                " ~INPUT_SCRIPT_SELECT~ ",//V~ ");//BACK
+                " ~INPUT_CURSOR_ACCEPT~ ",//LEFT MOUSE BUTTON~ ");//(NONE);
+                " ~INPUT_CURSOR_CANCEL~ ",//RIGHT MOUSE BUTTON~ ");//(NONE);
+                " ~INPUT_CURSOR_X~ ",//(NONE);~ ");//(NONE);
+                " ~INPUT_CURSOR_Y~ ",//(NONE);~ ");//(NONE);
+                " ~INPUT_CURSOR_SCROLL_UP~ ",//SCROLLWHEEL UP~ ");//(NONE);
+                " ~INPUT_CURSOR_SCROLL_DOWN~ ",//SCROLLWHEEL DOWN~ ");//(NONE);
+                " ~INPUT_ENTER_CHEAT_CODE~ ",//~ / `~ ");//(NONE);
+                " ~INPUT_INTERACTION_MENU~ ",//M~ ");//BACK
+                " ~INPUT_MP_TEXT_CHAT_ALL~ ",//T~ ");//(NONE);
+                " ~INPUT_MP_TEXT_CHAT_TEAM~ ",//Y~ ");//(NONE);
+                " ~INPUT_MP_TEXT_CHAT_FRIENDS~ ",//(NONE);~ ");//(NONE);
+                " ~INPUT_MP_TEXT_CHAT_CREW~ ",//(NONE);~ ");//(NONE);
+                " ~INPUT_PUSH_TO_TALK~ ",//N~ ");//(NONE);
+                " ~INPUT_CREATOR_LS~ ",//R~ ");//L3
+                " ~INPUT_CREATOR_RS~ ",//F~ ");//R3
+                " ~INPUT_CREATOR_LT~ ",//X~ ");//LT
+                " ~INPUT_CREATOR_RT~ ",//C~ ");//RT
+                " ~INPUT_CREATOR_MENU_TOGGLE~ ",//LEFT SHIFT~ ");//(NONE);
+                " ~INPUT_CREATOR_ACCEPT~ ",//SPACEBAR~ ");//A
+                " ~INPUT_CREATOR_DELETE~ ",//DELETE~ ");//X
+                " ~INPUT_ATTACK2~ ",//LEFT MOUSE BUTTON~ ");//RT
+                " ~INPUT_RAPPEL_JUMP~ ",//(NONE);~ ");//A
+                " ~INPUT_RAPPEL_LONG_JUMP~ ",//(NONE);~ ");//X
+                " ~INPUT_RAPPEL_SMASH_WINDOW~ ",//(NONE);~ ");//RT
+                " ~INPUT_PREV_WEAPON~ ",//SCROLLWHEEL UP~ ");//DPAD LEFT
+                " ~INPUT_NEXT_WEAPON~ ",//SCROLLWHEEL DOWN~ ");//DPAD RIGHT
+                " ~INPUT_MELEE_ATTACK1~ ",//R~ ");//B
+                " ~INPUT_MELEE_ATTACK2~ ",//Q~ ");//A
+                " ~INPUT_WHISTLE~ ",//(NONE);~ ");//(NONE);
+                " ~INPUT_MOVE_LEFT~ ",//D~ ");//LEFT STICK
+                " ~INPUT_MOVE_RIGHT~ ",//D~ ");//LEFT STICK
+                " ~INPUT_MOVE_UP~ ",//S~ ");//LEFT STICK
+                " ~INPUT_MOVE_DOWN~ ",//S~ ");//LEFT STICK
+                " ~INPUT_LOOK_LEFT~ ",//MOUSE RIGHT~ ");//RIGHT STICK
+                " ~INPUT_LOOK_RIGHT~ ",//MOUSE RIGHT~ ");//RIGHT STICK
+                " ~INPUT_LOOK_UP~ ",//MOUSE DOWN~ ");//RIGHT STICK
+                " ~INPUT_LOOK_DOWN~ ",//MOUSE DOWN~ ");//RIGHT STICK
+                " ~INPUT_SNIPER_ZOOM_IN~ ",//[~ ");//RIGHT STICK
+                " ~INPUT_SNIPER_ZOOM_OUT~ ",//[~ ");//RIGHT STICK
+                " ~INPUT_SNIPER_ZOOM_IN_ALTERNATE~ ",//[~ ");//LEFT STICK
+                " ~INPUT_SNIPER_ZOOM_OUT_ALTERNATE~ ",//[~ ");//LEFT STICK
+                " ~INPUT_VEH_MOVE_LEFT~ ",//D~ ");//LEFT STICK
+                " ~INPUT_VEH_MOVE_RIGHT~ ",//D~ ");//LEFT STICK
+                " ~INPUT_VEH_MOVE_UP~ ",//LEFT CTRL~ ");//LEFT STICK
+                " ~INPUT_VEH_MOVE_DOWN~ ",//LEFT CTRL~ ");//LEFT STICK
+                " ~INPUT_VEH_GUN_LEFT~ ",//MOUSE RIGHT~ ");//RIGHT STICK
+                " ~INPUT_VEH_GUN_RIGHT~ ",//MOUSE RIGHT~ ");//RIGHT STICK
+                " ~INPUT_VEH_GUN_UP~ ",//MOUSE RIGHT~ ");//RIGHT STICK
+                " ~INPUT_VEH_GUN_DOWN~ ",//MOUSE RIGHT~ ");//RIGHT STICK
+                " ~INPUT_VEH_LOOK_LEFT~ ",//MOUSE RIGHT~ ");//RIGHT STICK
+                " ~INPUT_VEH_LOOK_RIGHT~ ",//MOUSE RIGHT~ ");//RIGHT STICK
+                " ~INPUT_REPLAY_START_STOP_RECORDING~ ",//F1~ ");//A
+                " ~INPUT_REPLAY_START_STOP_RECORDING_SECONDARY~ ",//F2~ ");//X
+                " ~INPUT_SCALED_LOOK_LR~ ",//MOUSE RIGHT~ ");//RIGHT STICK
+                " ~INPUT_SCALED_LOOK_UD~ ",//MOUSE DOWN~ ");//RIGHT STICK
+                " ~INPUT_SCALED_LOOK_UP_ONLY~ ",//(NONE);~ ");//RIGHT STICK
+                " ~INPUT_SCALED_LOOK_DOWN_ONLY~ ",//(NONE);~ ");//RIGHT STICK
+                " ~INPUT_SCALED_LOOK_LEFT_ONLY~ ",//(NONE);~ ");//RIGHT STICK
+                " ~INPUT_SCALED_LOOK_RIGHT_ONLY~ ",//(NONE);~ ");//RIGHT STICK
+                " ~INPUT_REPLAY_MARKER_DELETE~ ",//DELETE~ ");//X
+                " ~INPUT_REPLAY_CLIP_DELETE~ ",//DELETE~ ");//Y
+                " ~INPUT_REPLAY_PAUSE~ ",//SPACEBAR~ ");//A
+                " ~INPUT_REPLAY_REWIND~ ",//ARROW DOWN~ ");//LB
+                " ~INPUT_REPLAY_FFWD~ ",//ARROW UP~ ");//RB
+                " ~INPUT_REPLAY_NEWMARKER~ ",//M~ ");//A
+                " ~INPUT_REPLAY_RECORD~ ",//S~ ");//(NONE);
+                " ~INPUT_REPLAY_SCREENSHOT~ ",//U~ ");//DPAD UP
+                " ~INPUT_REPLAY_HIDEHUD~ ",//H~ ");//R3
+                " ~INPUT_REPLAY_STARTPOINT~ ",//B~ ");//(NONE);
+                " ~INPUT_REPLAY_ENDPOINT~ ",//N~ ");//(NONE);
+                " ~INPUT_REPLAY_ADVANCE~ ",//ARROW RIGHT~ ");//DPAD RIGHT
+                " ~INPUT_REPLAY_BACK~ ",//ARROW LEFT~ ");//DPAD LEFT
+                " ~INPUT_REPLAY_TOOLS~ ",//T~ ");//DPAD DOWN
+                " ~INPUT_REPLAY_RESTART~ ",//R~ ");//BACK
+                " ~INPUT_REPLAY_SHOWHOTKEY~ ",//K~ ");//DPAD DOWN
+                " ~INPUT_REPLAY_CYCLEMARKERLEFT~ ",//[~ ");//DPAD LEFT
+                " ~INPUT_REPLAY_CYCLEMARKERRIGHT~ ",//]~ ");//DPAD RIGHT
+                " ~INPUT_REPLAY_FOVINCREASE~ ",//NUMPAD +~ ");//RB
+                " ~INPUT_REPLAY_FOVDECREASE~ ",//NUMPAD -~ ");//LB
+                " ~INPUT_REPLAY_CAMERAUP~ ",//PAGE UP~ ");//(NONE);
+                " ~INPUT_REPLAY_CAMERADOWN~ ",//PAGE DOWN~ ");//(NONE);
+                " ~INPUT_REPLAY_SAVE~ ",//F5~ ");//START
+                " ~INPUT_REPLAY_TOGGLETIME~ ",//C~ ");//(NONE);
+                " ~INPUT_REPLAY_TOGGLETIPS~ ",//V~ ");//(NONE);
+                " ~INPUT_REPLAY_PREVIEW~ ",//SPACEBAR~ ");//(NONE);
+                " ~INPUT_REPLAY_TOGGLE_TIMELINE~ ",//ESC~ ");//(NONE);
+                " ~INPUT_REPLAY_TIMELINE_PICKUP_CLIP~ ",//X~ ");//(NONE);
+                " ~INPUT_REPLAY_TIMELINE_DUPLICATE_CLIP~ ",//C~ ");//(NONE);
+                " ~INPUT_REPLAY_TIMELINE_PLACE_CLIP~ ",//V~ ");//(NONE);
+                " ~INPUT_REPLAY_CTRL~ ",//LEFT CTRL~ ");//(NONE);
+                " ~INPUT_REPLAY_TIMELINE_SAVE~ ",//F5~ ");//(NONE);
+                " ~INPUT_REPLAY_PREVIEW_AUDIO~ ",//SPACEBAR~ ");//RT
+                " ~INPUT_VEH_DRIVE_LOOK~ ",//LEFT MOUSE BUTTON~ ");//(NONE);
+                " ~INPUT_VEH_DRIVE_LOOK2~ ",//RIGHT MOUSE BUTTON~ ");//(NONE);
+                " ~INPUT_VEH_FLY_ATTACK2~ ",//RIGHT MOUSE BUTTON~ ");//(NONE);
+                " ~INPUT_RADIO_WHEEL_UD~ ",//MOUSE DOWN~ ");//RIGHT STICK
+                " ~INPUT_RADIO_WHEEL_LR~ ",//MOUSE RIGHT~ ");//RIGHT STICK
+                " ~INPUT_VEH_SLOWMO_UD~ ",//SCROLLWHEEL DOWN~ ");//LEFT STICK
+                " ~INPUT_VEH_SLOWMO_UP_ONLY~ ",//SCROLLWHEEL UP~ ");//LEFT STICK
+                " ~INPUT_VEH_SLOWMO_DOWN_ONLY~ ",//SCROLLWHEEL DOWN~ ");//LEFT STICK
+                " ~INPUT_VEH_HYDRAULICS_CONTROL_TOGGLE~ ",//X~ ");//A
+                " ~INPUT_VEH_HYDRAULICS_CONTROL_LEFT~ ",//A~ ");//LEFT STICK
+                " ~INPUT_VEH_HYDRAULICS_CONTROL_RIGHT~ ",//D~ ");//LEFT STICK
+                " ~INPUT_VEH_HYDRAULICS_CONTROL_UP~ ",//LEFT SHIFT~ ");//LEFT STICK
+                " ~INPUT_VEH_HYDRAULICS_CONTROL_DOWN~ ",//LEFT CTRL~ ");//LEFT STICK
+                " ~INPUT_VEH_HYDRAULICS_CONTROL_UD~ ",//D~ ");//LEFT STICK
+                " ~INPUT_VEH_HYDRAULICS_CONTROL_LR~ ",//LEFT CTRL~ ");//LEFT STICK
+                " ~INPUT_SWITCH_VISOR~ ",//F11~ ");//DPAD RIGHT
+                " ~INPUT_VEH_MELEE_HOLD~ ",//X~ ");//A
+                " ~INPUT_VEH_MELEE_LEFT~ ",//LEFT MOUSE BUTTON~ ");//LB
+                " ~INPUT_VEH_MELEE_RIGHT~ ",//RIGHT MOUSE BUTTON~ ");//RB
+                " ~INPUT_MAP_POI~ ",//SCROLLWHEEL BUTTON (PRESS);~ ");//Y
+                " ~INPUT_REPLAY_SNAPMATIC_PHOTO~ ",//TAB~ ");//X
+                " ~INPUT_VEH_CAR_JUMP~ ",//E~ ");//L3
+                " ~INPUT_VEH_ROCKET_BOOST~ ",//E~ ");//L3
+                " ~INPUT_VEH_FLY_BOOST~ ",//LEFT SHIFT~ ");//L3
+                " ~INPUT_VEH_PARACHUTE~ ",//SPACEBAR~ ");//A
+                " ~INPUT_VEH_BIKE_WINGS~ ",//X~ ");//A
+                " ~INPUT_VEH_FLY_BOMB_BAY~ ",//E~ ");//DPAD RIGHT
+                " ~INPUT_VEH_FLY_COUNTER~ ",//E~ ");//DPAD RIGHT
+                " ~INPUT_VEH_TRANSFORM~ ",//X~ ");//A
+                " ~INPUT_QUAD_LOCO_REVERSE~ ",//~ ");//RB
+                " ~INPUT_RESPAWN_FASTER~ ",//~ ");//
+                " ~INPUT_HUDMARKER_SELECT~ "
+            };
 
             return ControlList[iButton];
         }
@@ -4304,6 +4613,182 @@ namespace OnlinePlayerz
             Script.Wait(1000);
             UI.Notify("You  " + iKills + " - " + iKilled + " " + Kellar);
         }
+        public class FindVeh
+        {
+            public float MinRadi { get; set; }
+            public float MaxRadi { get; set; }
+            public string VehModel { get; set; }
+            public bool AddPlayer { get; set; }
+            public int AddtoBrain { get; set; }
+        }
+        public class PositionDirect
+        {
+            public Vector3 Pos { get; set; }
+            public float Dir { get; set; }
+        }
+        public PositionDirect GetVehPos(float fMinRadi, float fMaxRadi)
+        {
+            GetLogging("GetVehPos");
+            iFindingTime = Game.GameTime + 1000;
+            Vector3 vArea = Game.Player.Character.Position - (Game.Player.Character.ForwardVector * 15);
+            PositionDirect MyPosDir = null;
+            Vehicle[] CarSpot = World.GetNearbyVehicles(vArea, fMaxRadi);
+            for (int i = 0; i < CarSpot.Count(); i++)
+            {
+                if (VehExists(CarSpot, i))
+                {
+                    Vehicle Veh = CarSpot[i];
+                    if (Veh.IsPersistent == false && Veh.Position.DistanceTo(Game.Player.Character.Position) > fMinRadi && Veh.ClassType != VehicleClass.Boats && Veh.ClassType != VehicleClass.Cycles && Veh.ClassType != VehicleClass.Helicopters && Veh.ClassType != VehicleClass.Planes && Veh.ClassType != VehicleClass.Trains && Veh != Game.Player.Character.CurrentVehicle && !Veh.IsOnScreen && Veh.EngineRunning)
+                    {
+                        MyPosDir = new PositionDirect
+                        {
+                            Pos = Veh.Position,
+                            Dir = Veh.Heading
+                        };
+                        Veh.Delete();
+                        break;
+                    }
+
+                }
+            }
+
+            return MyPosDir;
+        }
+        private void VehRelpace(PositionDirect MyPos, FindVeh MyVeh)
+        {
+            VehicleSpawn(MyVeh.VehModel, MyPos.Pos, MyPos.Dir, MyVeh.AddPlayer, MyVeh.AddtoBrain, false);
+        }
+        private void SearchVeh(float fMin, float fMax, string sVehModel, bool bAddPlayer, int iBrainLevel)
+        {
+            GetLogging("SearchVeh, sVehModel == " + sVehModel + ",iBrainLevel == " + iBrainLevel);
+            FindVeh MyFinda = new FindVeh
+            {
+                MinRadi = fMin,
+                MaxRadi = fMax,
+                VehModel = sVehModel,
+                AddPlayer = bAddPlayer,
+                AddtoBrain = iBrainLevel
+            };
+            MakeCarz.Add(MyFinda);
+        }
+        public class FindPed
+        {
+            public float MinRadi { get; set; }
+            public float MaxRadi { get; set; }
+            public Vehicle MyCar { get; set; }
+            public int Seat { get; set; }
+            public int Reload { get; set; }
+        }
+        public PositionDirect GetPedPos(float fMinRadi, float fMaxRadi)
+        {
+            GetLogging("GetPedPos");
+            Vector3 vArea = Game.Player.Character.Position - (Game.Player.Character.ForwardVector * 15);
+            iFindingTime = Game.GameTime + 500;
+            PositionDirect MyPosDir = null;
+            Ped[] MadPeds = World.GetNearbyPeds(vArea, fMaxRadi);
+            for (int i = 0; i < MadPeds.Count(); i++)
+            {
+                if (PedExists(MadPeds, i))
+                {
+                    Ped MadP = MadPeds[i];
+
+                    if (!MadP.IsOnScreen && !MadP.IsInVehicle() && !MadP.IsDead && Function.Call<int>(Hash.GET_PED_TYPE, MadP.Handle) != 28 && MadP != Game.Player.Character && !MadP.IsPersistent && MadP.Position.DistanceTo(Game.Player.Character.Position) > fMinRadi)
+                    {
+                        MyPosDir = new PositionDirect
+                        {
+                            Pos = MadP.Position,
+                            Dir = MadP.Heading
+                        };
+                        MadP.Delete();
+                        break;
+                    }
+                }
+            }
+
+            return MyPosDir;
+        }
+        private void PedRelpace(PositionDirect MyPos, FindPed MyPeds)
+        {
+            GenPlayerPed(MyPos.Pos, MyPos.Dir, MyPeds.MyCar, MyPeds.Seat, MyPeds.Reload);
+        }
+        private void SearchPed(float fMin, float fMax, Vehicle vMyCar, int iSeat, int iReload)
+        {
+            GetLogging("SearchPed, iSeat == " + iSeat + ",iReload == " + iReload);
+            FindPed MyFinda = new FindPed
+            {
+                MinRadi = fMin,
+                MaxRadi = fMax,
+                MyCar = vMyCar,
+                Seat  = iSeat,
+                Reload = iReload
+            };
+            MakeFrenz.Add(MyFinda);
+        }
+        public class GetInAveh
+        {
+            public Ped Peddy { get; set; }
+            public Vehicle Vhic { get; set; }
+            public int Seats { get; set; }
+            public int PedLevel { get; set; }
+        }
+        private void SearchSeats(Ped pPeddy, Vehicle vVhic, int iPedLevel)
+        {
+            GetLogging("SearchSeats, iPedLevel == " + iPedLevel);
+            GetInAveh MyFinda = new GetInAveh
+            {
+                Peddy = pPeddy,
+                Vhic = vVhic,
+                PedLevel = iPedLevel,
+                Seats = -1
+            };
+            GetInQUe.Add(MyFinda); ;
+        }
+        private void PedDoGetIn(GetInAveh GetingOn)
+        {
+            GetLogging("PedDoGetIn");
+
+            iFindingTime = Game.GameTime + 1000;
+            int iSeats = GetingOn.Seats;
+
+            if (iSeats == -1)
+            {
+                while (iSeats < Function.Call<int>(Hash.GET_VEHICLE_MAX_NUMBER_OF_PASSENGERS, GetingOn.Vhic.Handle))
+                {
+                    if (Function.Call<bool>(Hash.IS_VEHICLE_SEAT_FREE, GetingOn.Vhic.Handle, iSeats))
+                        break;
+                    else
+                        iSeats += 1;
+                }
+                if (iSeats < Function.Call<int>(Hash.GET_VEHICLE_MAX_NUMBER_OF_PASSENGERS, GetingOn.Vhic.Handle))
+                    GetInQUe[0].Seats = iSeats;
+                else
+                    iSeats = -1;
+            }
+
+            if (iSeats != -1)
+            {
+                if (GetingOn.Peddy.Position.DistanceTo(GetingOn.Vhic.Position) < 65.00f)
+                {
+                    if (GetingOn.Peddy.Position.DistanceTo(GetingOn.Vhic.Position) > 65.00f)
+                        WarptoAnyVeh(GetingOn.Vhic, GetingOn.Peddy, GetingOn.Seats);
+                    else if (!Function.Call<bool>(Hash.IS_PED_GETTING_INTO_A_VEHICLE, GetingOn.Peddy.Handle))
+                        Function.Call(Hash.TASK_ENTER_VEHICLE, GetingOn.Peddy.Handle, GetingOn.Vhic.Handle, -1, GetingOn.Seats, 1.50f, 1, 0);
+                }
+                else
+                    WarptoAnyVeh(GetingOn.Vhic, GetingOn.Peddy, iSeats);
+            }
+            else
+            {
+                if (GetingOn.PedLevel != -1)
+                {
+                    int iBPed = ReteaveBrain(GetingOn.PedLevel);
+                    if (PedList[iBPed].ThisVeh != null)
+                        PedList[iBPed].ThisVeh.MarkAsNoLongerNeeded();
+                    GetInQUe.RemoveAt(0);
+                    SearchVeh(1.00f, 95.00f, RandVeh(RandInt(1, 9)), false, GetingOn.PedLevel);
+                }
+            }
+        }
         private void PlayerZerosAI()
         {
             if (ButtonDown(iGetlayList, false) && !bPlayerList)
@@ -4325,23 +4810,49 @@ namespace OnlinePlayerz
                     {
 
                     }
-                    else if (PedList[iBe].iTimeOn < Game.GameTime)
+                    else if (PedList[iBe].EnterVehQue)
                     {
-                        GetOutVehicle(PedList[iBe].ThisPed, PedList[iBe].iLevel);
-                        PedCleaning(PedList[iBe].iLevel, "left", false);
+                        if (!Game.Player.Character.IsInVehicle())
+                        {
+                            PedList[iBe].EnterVehQue = false;
+                            GetInQUe.Clear();
+                        }
+                    }
+                    else if (PedList[iBe].TimeOn < Game.GameTime)
+                    {
+                        PedList[iBe].AirAttack = 0;
+                        Function.Call(Hash.REMOVE_PED_FROM_GROUP, PedList[iBe].ThisPed.Handle);
+                        GetOutVehicle(PedList[iBe].ThisPed, PedList[iBe].Level);
+                        PedCleaning(PedList[iBe].Level, "left", false);
                     }
                     else if (Game.Player.Character.GetKiller() == PedList[iBe].ThisPed)
                     {
-                        PedList[iBe].iKills += 1;
-                        WhileYouDead(PedList[iBe].sMyName, PedList[iBe].iKilled, PedList[iBe].iKills, PedList[iBe].ThisPed);
+                        PedList[iBe].Kills += 1;
+                        WhileYouDead(PedList[iBe].MyName, PedList[iBe].Killed, PedList[iBe].Kills, PedList[iBe].ThisPed);
                         if (iAggression < 6)
-                            PedCleaning(PedList[iBe].iLevel, "left", false);
+                            PedCleaning(PedList[iBe].Level, "left", false);
                     }
                     else if (PedList[iBe].ThisPed.IsDead)
                     {
-                        if (PedList[iBe].iDeathSequence == 0)
+                        if (PedList[iBe].DeathSequence == 0)
                         {
-                            if (PedList[iBe].ThisVeh != null)
+                            PedList[iBe].AirAttack = 0;
+
+                            if (PedList[iBe].ThisOppress != null)
+                            {
+                                EmptyVeh(PedList[iBe].ThisOppress);
+                                PedList[iBe].ThisOppress.Explode();
+                                PedList[iBe].ThisOppress.MarkAsNoLongerNeeded();
+                                PedList[iBe].ThisOppress = null;
+
+                                if (PedList[iBe].ThisVeh != null)
+                                {
+                                    EmptyVeh(PedList[iBe].ThisVeh);
+                                    PedList[iBe].ThisVeh.Delete();
+                                    PedList[iBe].ThisVeh = null;
+                                }
+                            }
+                            else if (PedList[iBe].ThisVeh != null)
                             {
                                 EmptyVeh(PedList[iBe].ThisVeh);
                                 PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
@@ -4350,299 +4861,444 @@ namespace OnlinePlayerz
 
                             int iDie = WhoShotMe(PedList[iBe].ThisPed);
 
-                            ClearPedBlips(PedList[iBe].iLevel);
+                            ClearPedBlips(PedList[iBe].Level);
 
                             if (PedList[iBe].ThisPed.GetKiller() == Game.Player.Character)
                             {
-                                if (PedList[iBe].bBounty)
+                                if (PedList[iBe].Bounty)
                                     Game.Player.Money += 7000;
-                                PedList[iBe].bFriendly = false;
-                                PedList[iBe].iColours = 1;
-                                PedList[iBe].bApprochPlayer = false;
-                                PedList[iBe].bFollower = false;
-                                PedList[iBe].iKilled += 1;
-                                UI.Notify("You  " + PedList[iBe].iKilled + " - " + PedList[iBe].iKills + " " + PedList[iBe].sMyName);
+                                PedList[iBe].Friendly = false;
+                                PedList[iBe].Colours = 1;
+                                PedList[iBe].ApprochPlayer = false;
+                                Function.Call(Hash.REMOVE_PED_FROM_GROUP, PedList[iBe].ThisPed.Handle);
+                                PedList[iBe].Follower = false;
+                                PedList[iBe].Killed += 1;
+                                UI.Notify("You  " + PedList[iBe].Killed + " - " + PedList[iBe].Kills + " " + PedList[iBe].MyName);
                             }
                             else if (iDie != -1)
-                                UI.Notify(PedList[iDie].sMyName + " Killed " + PedList[iBe].sMyName);
+                                UI.Notify(PedList[iDie].MyName + " Killed " + PedList[iBe].MyName);
                             else
-                                UI.Notify(PedList[iBe].sMyName + " died");
+                                UI.Notify(PedList[iBe].MyName + " died");
 
-                            PedList[iBe].bBounty = false;
-                            PedList[iBe].iDeathSequence += 1;
-                            PedList[iBe].iDeathTime = Game.GameTime + 10000;
-                            PedList[iBe].iTimeOn += 60000;
+                            PedList[iBe].Bounty = false;
+                            PedList[iBe].DeathSequence += 1;
+                            PedList[iBe].DeathTime = Game.GameTime + 10000;
+                            PedList[iBe].TimeOn += 60000;
+                            Function.Call(Hash.REMOVE_PED_FROM_GROUP, PedList[iBe].ThisPed.Handle);
                         }
-                        else if (PedList[iBe].iDeathSequence == 1 || PedList[iBe].iDeathSequence == 3 || PedList[iBe].iDeathSequence == 5 || PedList[iBe].iDeathSequence == 7)
+                        else if (PedList[iBe].DeathSequence == 1 || PedList[iBe].DeathSequence == 3 || PedList[iBe].DeathSequence == 5 || PedList[iBe].DeathSequence == 7)
                         {
-                            if (PedList[iBe].iDeathTime < Game.GameTime)
+                            if (PedList[iBe].DeathTime < Game.GameTime)
                             {
                                 PedList[iBe].ThisPed.Alpha = 80;
-                                PedList[iBe].iDeathSequence += 1;
-                                PedList[iBe].iDeathTime = Game.GameTime + 500;
+                                PedList[iBe].DeathSequence += 1;
+                                PedList[iBe].DeathTime = Game.GameTime + 500;
                             }
                         }
-                        else if (PedList[iBe].iDeathSequence == 2 || PedList[iBe].iDeathSequence == 4 || PedList[iBe].iDeathSequence == 6)
+                        else if (PedList[iBe].DeathSequence == 2 || PedList[iBe].DeathSequence == 4 || PedList[iBe].DeathSequence == 6)
                         {
-                            if (PedList[iBe].iDeathTime < Game.GameTime)
+                            if (PedList[iBe].DeathTime < Game.GameTime)
                             {
                                 PedList[iBe].ThisPed.Alpha = 255;
-                                PedList[iBe].iDeathSequence += 1;
-                                PedList[iBe].iDeathTime = Game.GameTime + 500;
+                                PedList[iBe].DeathSequence += 1;
+                                PedList[iBe].DeathTime = Game.GameTime + 500;
                             }
                         }
-                        else if (PedList[iBe].iDeathSequence == 8)
+                        else if (PedList[iBe].DeathSequence == 8)
                         {
-                            if (!bStuckOnYou)
+                            if (PedList[iBe].DeathTime < Game.GameTime)
                             {
-                                if (PedList[iBe].iDeathTime < Game.GameTime)
+                                if (PedList[iBe].Killed > RandInt(13, 22) || iAggression < 2)
                                 {
-                                    if (PedList[iBe].iKilled > RandInt(13, 22) || iAggression < 2)
-                                    {
-                                        PedCleaning(PedList[iBe].iLevel, "left", false);
-                                    }
-                                    else if (PedList[iBe].iKilled > 15 && PedList[iBe].iKills == 0 && iAggression > 7)
-                                        FireOrb(PedList[iBe].iLevel, Game.Player.Character);
-                                    else
-                                    {
-                                        ClearPedBlips(PedList[iBe].iLevel);
-                                        PedList[iBe].iDeathSequence = 10;
-                                        PedList[iBe].ThisPed.Delete();
-                                        PedList[iBe].ThisPed = null;
-                                        bStuckOnYou = true;
-                                        Vector3 Posy = FindAPed(Game.Player.Character.Position, 95.00f, true, PedList[iBe].iLevel);
-                                    }
+                                    PedCleaning(PedList[iBe].Level, "left", false);
+                                }
+                                else if (PedList[iBe].Killed > 15 && PedList[iBe].Kills == 0 && iAggression > 7)
+                                    FireOrb(PedList[iBe].Level, Game.Player.Character);
+                                else
+                                {
+                                    ClearPedBlips(PedList[iBe].Level);
+                                    PedList[iBe].DeathSequence = 10;
+                                    Function.Call(Hash.REMOVE_PED_FROM_GROUP, PedList[iBe].ThisPed.Handle);
+                                    PedList[iBe].ThisPed.Delete();
+                                    PedList[iBe].ThisPed = null;
+                                    SearchPed(35.00f, 220.00f, null, 0, PedList[iBe].Level);
                                 }
                             }
                         }
                     }
-                    else if (PedList[iBe].ThisPed.Position.Z < -90.00f)
+                    else if (PedList[iBe].ThisPed.IsInAir && !PedList[iBe].ThisPed.IsInVehicle())
                     {
-                        PedList[iBe].ThisPed.Kill();
+                        if (PedList[iBe].Befallen)
+                        {
+                            if (PedList[iBe].DeathTime < Game.GameTime)
+                                PedList[iBe].ThisPed.Kill();
+                        }
+                        else
+                        {
+                            PedList[iBe].Befallen = true;
+                            PedList[iBe].DeathTime = Game.GameTime + 5000;
+                        }
                     }
-                    else if (PedList[iBe].bHacker && !bHackEvent)
+                    else if (PedList[iBe].Befallen)
+                        PedList[iBe].Befallen = false;
+                    else if (PedList[iBe].Hacker && !bHackEvent)
                     {
-                        if (PedList[iBe].ThisPed.Position.DistanceTo(Game.Player.Character.Position) < 40.00f)
+                        if (PedList[iBe].ThisPed.Position.DistanceTo(YoPoza()) < 40.00f)
                         {
                             bHackEvent = true;
                             HackerTime(PedList[iBe].ThisPed);
                         }
                     }
-                    else if (PedList[iBe].bSessionJumper)
+                    else if (PedList[iBe].SessionJumper)
                     {
-                        if (PedList[iBe].ThisPed.Position.DistanceTo(Game.Player.Character.Position) < 10.00f)
-                            PedCleaning(PedList[iBe].iLevel, "has disappeared", true);
+                        if (PedList[iBe].ThisPed.Position.DistanceTo(YoPoza()) < 10.00f)
+                            PedCleaning(PedList[iBe].Level, "has disappeared", true);
                     }
-                    else if (PedList[iBe].bDriver)
+                    else if (PedList[iBe].AirAttack != 0)
                     {
-                        if (PedList[iBe].ThisPed.IsInVehicle())
+                        if (!PedList[iBe].ThisPed.IsInVehicle())
+                            PedList[iBe].AirAttack = 0;
+                        else if (PedList[iBe].FindPlayer < Game.GameTime)
                         {
-                            if (PedList[iBe].bFollower)
+                            PedList[iBe].FindPlayer = Game.GameTime + 5000;
+                            if (Game.Player.Character.IsInVehicle())
                             {
-                                if (Game.Player.Character.IsInVehicle(PedList[iBe].ThisPed.CurrentVehicle))
+                                if (PedList[iBe].AirAttack == 1)
+                                    FlyAway(PedList[iBe].ThisPed, YoPoza(), 250.00f, 0.00f);
+                                else if (PedList[iBe].AirAttack == 2)
                                 {
-                                    if (Game.IsWaypointActive)
-                                    {
-                                        if (World.GetWaypointPosition() != LetsGoHere)
-                                        {
-                                            LetsGoHere = World.GetWaypointPosition();
-                                            DriveToooDest(PedList[iBe].ThisPed, LetsGoHere);
-                                        }
-                                    }
+                                    int iFlight = 6;
+                                    if (iAggression > 8)
+                                        iFlight = 2;
 
+                                    Function.Call(Hash.TASK_PLANE_MISSION, PedList[iBe].ThisPed.Handle, PedList[iBe].ThisVeh.Handle, Game.Player.Character.CurrentVehicle.Handle, 0, 0, 0, 0, iFlight, 0.0f, 0.0f, PedList[iBe].AirDirect, 1000.0f, -5000.0f);
                                 }
-                                else if (Game.Player.Character.IsInVehicle())
-                                {
-                                    if (PedList[iBe].ThisBlip == null)
-                                        PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 225, PedList[iBe].sMyName, PedList[iBe].iColours);
-
-                                    if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) > 25.00f)
-                                    {
-                                        if (PedList[iBe].iFindPlayer < Game.GameTime)
-                                        {
-                                            PedList[iBe].iFindPlayer = Game.GameTime + 5000;
-                                            DriveTooo(PedList[iBe].ThisPed, false);
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    GetOutVehicle(PedList[iBe].ThisPed, PedList[iBe].iLevel);
-                                    if (PedList[iBe].ThisVeh != null)
-                                    {
-                                        PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
-                                        PedList[iBe].ThisVeh = null;
-                                    }
-                                    PedList[iBe].bPassenger = false;
-                                    PedList[iBe].bDriver = false;
-                                    Function.Call(Hash.TASK_FOLLOW_TO_OFFSET_OF_ENTITY, PedList[iBe].ThisPed, Game.Player.Character.Handle, 0.0f, 3.0f, 0.0f, 1.0f, -1, 0.5f, true);
-                                }
+                                else if (PedList[iBe].AirAttack == 3)
+                                    Function.Call(Hash.TASK_PLANE_MISSION, PedList[iBe].ThisPed.Handle, PedList[iBe].ThisVeh.Handle, Game.Player.Character.CurrentVehicle.Handle, 0, 0, 0, 0, 6, 0.0f, 0.0f, PedList[iBe].AirDirect, 300.0f, -5000.0f);
                             }
-                            else if (PedList[iBe].bApprochPlayer)
+                            else
                             {
-                                if (iAggression < 6 && PedList[iBe].bFriendly && iFollow < 8)
+                                if (PedList[iBe].AirAttack == 1)
+                                    FlyAway(PedList[iBe].ThisPed, YoPoza(), 250.00f, 0.00f);
+                                else if (PedList[iBe].AirAttack == 2)
                                 {
-                                    if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) < 5.00f)
+                                    int iFlight = 6;
+                                    if (iAggression > 8)
+                                        iFlight = 2;
+
+                                    Function.Call(Hash.TASK_PLANE_MISSION, PedList[iBe].ThisPed.Handle, PedList[iBe].ThisVeh.Handle, 0, Game.Player.Character.Handle, 0, 0, 0, iFlight, 0.0f, 0.0f, PedList[iBe].AirDirect, 1000.0f, -5000.0f);
+                                }
+                                else if (PedList[iBe].AirAttack == 3)
+                                    Function.Call(Hash.TASK_PLANE_MISSION, PedList[iBe].ThisPed.Handle, PedList[iBe].ThisVeh.Handle, 0, Game.Player.Character.Handle, 0, 0, 0, 6, 0.0f, 0.0f, PedList[iBe].AirDirect, 300.0f, -5000.0f);
+                            }
+                        }
+                    }
+                    else if (PedList[iBe].Driver)
+                    {
+                        if (PedList[iBe].ThisVeh != null)
+                        {
+                            if (PedList[iBe].ThisPed.IsInVehicle())
+                            {
+
+                                if (PedList[iBe].DirBlip != null)
+                                {
+                                    ClearPedBlips(PedList[iBe].Level);
+                                    PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, OhMyBlip(PedList[iBe].ThisVeh), PedList[iBe].MyName, PedList[iBe].Colours);
+                                }
+                                else if (PedList[iBe].Follower)
+                                {
+                                    if (Game.Player.Character.IsInVehicle(PedList[iBe].ThisPed.CurrentVehicle))
                                     {
-                                        if (!PedList[iBe].bHorny)
+                                        if (Game.IsWaypointActive)
                                         {
-                                            PedList[iBe].bHorny = true;
-                                            PedList[iBe].ThisVeh.SoundHorn(3000);
-                                            TopLeftUI("Press" + ControlSybols(23) + "to enter vehicle");
-                                        }
-                                        else if (!Game.Player.Character.IsInVehicle())
-                                        {
-                                            if (ButtonDown(23, true))
+                                            if (World.GetWaypointPosition() != LetsGoHere)
                                             {
-                                                PedList[iBe].iTimeOn += 60000;
-                                                EnterAnyVeh(PedList[iBe].ThisVeh, Game.Player.Character, 2.00f, -1);
+                                                LetsGoHere = World.GetWaypointPosition();
+                                                DriveToooDest(PedList[iBe].ThisPed, LetsGoHere);
                                             }
-                                        }
-                                        else
-                                        {
-                                            PedList[iBe].bApprochPlayer = false;
-                                            if (Game.Player.Character.IsInVehicle(PedList[iBe].ThisVeh))
-                                            {
-                                                PedList[iBe].iColours = 38;
-                                                PedList[iBe].bFollower = true;
-                                                FolllowTheLeader(PedList[iBe].ThisPed);
-                                                iFollow += 1;
-                                            }
-                                            DriveAround(PedList[iBe].ThisPed);
                                         }
                                     }
-                                    else if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) > 25.00f)
+                                    else if (Game.Player.Character.IsInVehicle())
                                     {
-                                        if (PedList[iBe].iFindPlayer < Game.GameTime)
+                                        if (PedList[iBe].ThisBlip == null)
+                                            PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 225, PedList[iBe].MyName, PedList[iBe].Colours);
+
+                                        if (YoPoza().DistanceTo(PedList[iBe].ThisPed.Position) > 25.00f)
                                         {
-                                            PedList[iBe].iFindPlayer = Game.GameTime + 5000;
-                                            DriveTooo(PedList[iBe].ThisPed, false);
+                                            if (PedList[iBe].FindPlayer < Game.GameTime)
+                                            {
+                                                PedList[iBe].FindPlayer = Game.GameTime + 5000;
+                                                DriveTooo(PedList[iBe].ThisPed, false);
+                                            }
                                         }
+                                    }
+                                    else
+                                    {
+                                        GetOutVehicle(PedList[iBe].ThisPed, PedList[iBe].Level);
+                                        if (PedList[iBe].ThisVeh != null)
+                                        {
+                                            PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
+                                            PedList[iBe].ThisVeh = null;
+                                        }
+                                        PedList[iBe].Passenger = false;
+                                        PedList[iBe].Driver = false;
+                                        OhDoKeepUp(PedList[iBe].ThisPed);
                                     }
                                 }
-                                else
+                                else if (PedList[iBe].ApprochPlayer)
                                 {
-                                    if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) < 5.00f)
+                                    if (iAggression < 9 && PedList[iBe].Friendly && iFollow < 7)
                                     {
-                                        PedList[iBe].bApprochPlayer = false;
-                                        PedList[iBe].ThisVeh.SoundHorn(3000);
-                                    }
-                                    else if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) > 45.00f)
-                                    {
-                                        if (PedList[iBe].iFindPlayer < Game.GameTime)
+                                        if (YoPoza().DistanceTo(PedList[iBe].ThisPed.Position) < 5.00f)
                                         {
-                                            PedList[iBe].iFindPlayer = Game.GameTime + 5000;
+                                            if (!PedList[iBe].Horny)
+                                            {
+                                                PedList[iBe].Horny = true;
+                                                PedList[iBe].ThisVeh.SoundHorn(3000);
+                                                TopLeftUI("Press" + ControlSybols(23) + "to enter vehicle");
+                                            }
+                                            else if (!Game.Player.Character.IsInVehicle())
+                                            {
+                                                if (ButtonDown(23, true))
+                                                {
+                                                    PedList[iBe].TimeOn = Game.GameTime + 600000;
+                                                    PedList[iBe].ApprochPlayer = false;
+                                                    PedList[iBe].Colours = 38;
+                                                    PedList[iBe].Follower = true;
+                                                    FolllowTheLeader(PedList[iBe].ThisPed);
+                                                    iFollow += 1;
+                                                    PlayerEnterVeh(PedList[iBe].ThisVeh);
+                                                    DriveAround(PedList[iBe].ThisPed);
+                                                }
+                                            }
+                                            else
+                                            {
+                                                PedList[iBe].ApprochPlayer = false;
+                                                DriveAround(PedList[iBe].ThisPed);
+                                            }
+                                        }
+                                        else if (YoPoza().DistanceTo(PedList[iBe].ThisPed.Position) > 25.00f)
+                                        {
+                                            if (PedList[iBe].FindPlayer < Game.GameTime)
+                                            {
+                                                PedList[iBe].FindPlayer = Game.GameTime + 5000;
+                                                DriveTooo(PedList[iBe].ThisPed, false);
+                                            }
+                                        }
+                                    }
+                                    else if (iAggression > 8)
+                                    {
+                                        if (PedList[iBe].FindPlayer < Game.GameTime)
+                                        {
+                                            PedList[iBe].FindPlayer = Game.GameTime + 5000;
                                             DriveBye(PedList[iBe].ThisPed);
                                         }
                                     }
                                 }
                             }
+                            else
+                            {
+                                if (PedList[iBe].Follower)
+                                {
+                                    if (PedList[iBe].ThisPed.IsInCombat)
+                                    {
+                                        if (PedList[iBe].DirBlip == null)
+                                        {
+                                            ClearPedBlips(PedList[iBe].Level);
+                                            PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
+                                            PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].MyName, PedList[iBe].Colours);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if (Game.Player.Character.IsInVehicle())
+                                        {
+                                            if (PedList[iBe].ThisVeh != null)
+                                            {
+                                                PedList[iBe].EnterVehQue = true;
+                                                SearchSeats(PedList[iBe].ThisPed, PedList[iBe].ThisVeh, PedList[iBe].Level);
+                                            }
+                                            else
+                                                PedList[iBe].Driver = false;
+                                        }
+                                        else
+                                        {
+                                            if (PedList[iBe].ThisVeh != null)
+                                            {
+                                                PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
+                                                PedList[iBe].ThisVeh = null;
+                                            }
+                                            PedList[iBe].Driver = false;
+
+                                            if (PedList[iBe].DirBlip == null)
+                                            {
+                                                ClearPedBlips(PedList[iBe].Level);
+                                                PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
+                                                PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].MyName, PedList[iBe].Colours);
+                                            }
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    EmptyVeh(PedList[iBe].ThisVeh);
+                                    PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
+                                    PedList[iBe].ThisVeh = null;
+
+                                    if (PedList[iBe].DirBlip == null)
+                                    {
+                                        ClearPedBlips(PedList[iBe].Level);
+                                        PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
+                                        PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].MyName, PedList[iBe].Colours);
+                                    }
+                                }
+                            }
                         }
                         else
-                        {
-                            if (PedList[iBe].ThisVeh != null)
-                            {
-                                PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
-                                PedList[iBe].ThisVeh = null;
-                            }
-                            PedList[iBe].bApprochPlayer = false;
-                            PedList[iBe].bDriver = false;
-                            ClearPedBlips(PedList[iBe].iLevel);
-                            PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
-                            PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
-                        }
+                            PedList[iBe].Driver = false;
                     }
-                    else if (PedList[iBe].bPassenger)
+                    else if (PedList[iBe].Passenger)
                     {
-                        if (PedList[iBe].bFollower)
+                        if (PedList[iBe].Follower)
                         {
                             if (!Game.Player.Character.IsInVehicle())
                             {
-                                PedList[iBe].bPassenger = false;
-                                ClearPedBlips(PedList[iBe].iLevel);
+                                PedList[iBe].Passenger = false;
+                                ClearPedBlips(PedList[iBe].Level);
                                 PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
-                                PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
+                                PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].MyName, PedList[iBe].Colours);
                                 PedList[iBe].ThisPed.Task.LeaveVehicle();
-                                Function.Call(Hash.TASK_FOLLOW_TO_OFFSET_OF_ENTITY, PedList[iBe].ThisPed, Game.Player.Character.Handle, 0.0f, 3.0f, 0.0f, 1.0f, -1, 0.5f, true);
+                                OhDoKeepUp(PedList[iBe].ThisPed);
                             }
                         }
                         else
                         {
                             if (!PedList[iBe].ThisPed.IsInVehicle())
                             {
-                                PedList[iBe].bPassenger = false;
-                                ClearPedBlips(PedList[iBe].iLevel);
+                                PedList[iBe].Passenger = false;
+                                ClearPedBlips(PedList[iBe].Level);
                                 PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
-                                PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
+                                PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].MyName, PedList[iBe].Colours);
+                            }
+                            else if (Game.Player.Character.IsInVehicle(PedList[iBe].ThisPed.CurrentVehicle) && PedList[iBe].Friendly && iFollow < 7)
+                            {
+                                FolllowTheLeader(PedList[iBe].ThisPed);
+                                PedList[iBe].Colours = 38;
+                                PedList[iBe].Follower = true;
+                                iFollow += 1;
                             }
                         }
                     }
-                    else if (PedList[iBe].bFollower)
+                    else if (PedList[iBe].Follower)
                     {
                         if (Game.Player.Character.IsInVehicle())
                         {
-                            PedList[iBe].bPassenger = true;
+                            PedList[iBe].Passenger = true;
                             Vehicle DisVeh = Game.Player.Character.CurrentVehicle;
-                            EnterAnyVeh(DisVeh, PedList[iBe].ThisPed, 2.00f, PedList[iBe].iLevel);
-                            ClearPedBlips(PedList[iBe].iLevel);
+                            SearchSeats(PedList[iBe].ThisPed, DisVeh, PedList[iBe].Level);
+                            PedList[iBe].EnterVehQue = true;
+                            PedList[iBe].TimeOn += 60000;
+                        }
+                        else if (YoPoza().DistanceTo(PedList[iBe].ThisPed.Position) > 150.00f)
+                        {
+                            PedList[iBe].ThisPed.Position = YoPoza() + (Game.Player.Character.RightVector * 2);
+                            OhDoKeepUp(PedList[iBe].ThisPed);
                         }
                     }
-                    else if (PedList[iBe].bFriendly)
+                    else if (PedList[iBe].Friendly)
                     {
                         if (PedList[iBe].ThisPed.HasBeenDamagedBy(Game.Player.Character) || PedList[iBe].ThisPed.IsInCombatAgainst(Game.Player.Character) && iAggression > 2)
                         {
-                            ClearPedBlips(PedList[iBe].iLevel);
-                            ExMember(PedList[iBe].ThisPed);
-                            PedList[iBe].iColours = 1;
+                            ClearPedBlips(PedList[iBe].Level);
+                            PedList[iBe].Colours = 1;
+                            if (iAggression < 5)
+                                PedList[iBe].TimeOn = Game.GameTime + 120000;
+                            else
+                                PedList[iBe].TimeOn += 120000;
+
                             FightPlayer(PedList[iBe].ThisPed, false);
-                            PedList[iBe].bFriendly = false;
-                            if (PedList[iBe].bFollower)
+                            PedList[iBe].Friendly = false;
+                            if (PedList[iBe].Follower)
                             {
-                                PedList[iBe].bFollower = false;
+                                Function.Call(Hash.REMOVE_PED_FROM_GROUP, PedList[iBe].ThisPed.Handle);
+                                PedList[iBe].Follower = false;
                                 iFollow -= 1;
                             }
                             PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
-                            PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
+                            PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].MyName, PedList[iBe].Colours);
                         }
                         else
                         {
-                            if (Game.Player.Character.Position.DistanceTo(PedList[iBe].ThisPed.Position) < 7.00f && !PedList[iBe].ThisPed.IsInVehicle() && iFollow < 8)
+                            if (YoPoza().DistanceTo(PedList[iBe].ThisPed.Position) < 7.00f && !PedList[iBe].ThisPed.IsInVehicle() && iFollow < 7)
                             {
                                 if (Game.Player.Character.IsInVehicle())
                                 {
                                     if (Game.Player.Character.SeatIndex == VehicleSeat.Driver)
                                     {
-                                        if (!PedList[iBe].bHorny2)
+                                        if (!PedList[iBe].Horny2)
                                         {
                                             TopLeftUI("Press" + ControlSybols(86) + "to attract the players attention");
-                                            PedList[iBe].bHorny2 = true;
+                                            PedList[iBe].Horny2 = true;
                                         }
                                         else if (ButtonDown(86, false))
                                         {
                                             if (iAggression < 9)
                                             {
-                                                ClearPedBlips(PedList[iBe].iLevel);
+                                                ClearPedBlips(PedList[iBe].Level);
 
-                                                PedList[iBe].iColours = 38;
+                                                PedList[iBe].Colours = 38;
                                                 PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
-                                                PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
-
+                                                PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].MyName, PedList[iBe].Colours);
                                                 FolllowTheLeader(PedList[iBe].ThisPed);
-                                                PedList[iBe].iTimeOn += 60000;
+                                                OhDoKeepUp(PedList[iBe].ThisPed);
+                                                PedList[iBe].TimeOn = Game.GameTime + 600000;
                                                 iFollow += 1;
 
-                                                PedList[iBe].bFollower = true;
+                                                PedList[iBe].Follower = true;
                                             }
                                             else
                                             {
-                                                ClearPedBlips(PedList[iBe].iLevel);
-                                                ExMember(PedList[iBe].ThisPed);
+                                                ClearPedBlips(PedList[iBe].Level);
                                                 FightPlayer(PedList[iBe].ThisPed, false);
-                                                PedList[iBe].iColours = 3;
-                                                PedList[iBe].bFriendly = false;
+                                                PedList[iBe].Colours = 3;
+                                                PedList[iBe].Friendly = false;
                                                 PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
-                                                PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
+                                                PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].MyName, PedList[iBe].Colours);
                                             }
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    if (!PedList[iBe].Horny2)
+                                    {
+                                        TopLeftUI("Press" + ControlSybols(46) + "to invte this player");
+                                        PedList[iBe].Horny2 = true;
+                                    }
+                                    else if (ButtonDown(46, false))
+                                    {
+                                        if (iAggression < 9)
+                                        {
+                                            ClearPedBlips(PedList[iBe].Level);
+
+                                            PedList[iBe].Colours = 38;
+                                            PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
+                                            PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].MyName, PedList[iBe].Colours);
+                                            FolllowTheLeader(PedList[iBe].ThisPed);
+                                            OhDoKeepUp(PedList[iBe].ThisPed);
+                                            PedList[iBe].TimeOn = Game.GameTime + 600000;
+                                            iFollow += 1;
+
+                                            PedList[iBe].Follower = true;
+                                        }
+                                        else
+                                        {
+                                            ClearPedBlips(PedList[iBe].Level);
+                                            FightPlayer(PedList[iBe].ThisPed, false);
+                                            PedList[iBe].Colours = 3;
+                                            PedList[iBe].Friendly = false;
+                                            PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
+                                            PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].MyName, PedList[iBe].Colours);
                                         }
                                     }
                                 }
@@ -4651,27 +5307,27 @@ namespace OnlinePlayerz
                     }
                     else
                     {
-                        if (!PedList[iBe].bOffRadar && PedList[iBe].iOffRadar == -1)
+                        if (!PedList[iBe].OffRadarBool && PedList[iBe].OffRadar == -1)
                         {
 
-                            PedList[iBe].iOffRadar = Game.GameTime + 300000;
-                            ClearPedBlips(PedList[iBe].iLevel);
-                            UI.Notify("~h~" + PedList[iBe].sMyName + "~s~ has gone off radar");
+                            PedList[iBe].OffRadar = Game.GameTime + 300000;
+                            ClearPedBlips(PedList[iBe].Level);
+                            UI.Notify("~h~" + PedList[iBe].MyName + "~s~ has gone off radar");
                         }
-                        else if (PedList[iBe].bOffRadar)
+                        else if (PedList[iBe].OffRadarBool)
                         {
-                            if (PedList[iBe].iOffRadar < Game.GameTime)
+                            if (PedList[iBe].OffRadar < Game.GameTime)
                             {
-                                PedList[iBe].bOffRadar = false;
-                                ClearPedBlips(PedList[iBe].iLevel);
+                                PedList[iBe].OffRadarBool = false;
+                                ClearPedBlips(PedList[iBe].Level);
                                 PedList[iBe].DirBlip = DirectionalBlimp(PedList[iBe].ThisPed);
-                                PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].sMyName, PedList[iBe].iColours);
+                                PedList[iBe].ThisBlip = PedBlimp(PedList[iBe].ThisPed, 1, PedList[iBe].MyName, PedList[iBe].Colours);
                             }
                         }
-                        else if (PedList[iBe].ThisPed.Position.DistanceTo(Game.Player.Character.Position) > 350.00f && iAggression > 4 && PedList[iBe].iDeathSequence == 0 && !bStuckOnYou)
+                        else if (PedList[iBe].ThisPed.Position.DistanceTo(YoPoza()) > 350.00f && iAggression > 6 && PedList[iBe].DeathSequence == 0)
                         {
                             if (PedList[iBe].ThisVeh == null)
-                                AirAttack(PedList[iBe].iLevel);
+                                AirAttack(PedList[iBe].Level);
                         }
                         else if (bPiggyBack)
                         {
@@ -4696,7 +5352,7 @@ namespace OnlinePlayerz
                 {
                     AfkPlayer HouseBlip = ThisAFKer(iBlpList);
 
-                    if (HouseBlip.iTimeOn < Game.GameTime)
+                    if (HouseBlip.TimeOn < Game.GameTime)
                     {
                         DeListingBrains(false, iBlpList, true);
                         iCurrentPlayerz -= 1;
@@ -4706,12 +5362,14 @@ namespace OnlinePlayerz
                 else
                     iBlpList = 0;
 
-                if (!bStuckOnYou && bSearching)
-                {
-                    if (BTimer(1))
-                        NewPlayer();
-                }
+                if (BTimer(1))
+                    NewPlayer();
             }
+        }
+        public Vector3 YoPoza()
+        {
+            Ped XPed = Game.Player.Character;
+            return XPed.Position;
         }
         private void OnTick(object sender, EventArgs e)
         {
@@ -4726,6 +5384,64 @@ namespace OnlinePlayerz
             }
             else
                 PlayerZerosAI();
+            if (!bDisabled)
+            {
+                iRotateFind += 1;
+                if (iRotateFind == 1)
+                {
+                    if (GetInQUe.Count > 0)
+                    {
+                        if (!GetInQUe[0].Peddy.IsInVehicle(GetInQUe[0].Vhic) && !GetInQUe[0].Peddy.IsDead && !GetInQUe[0].Peddy.IsFalling)
+                        {
+                            if (iFindingTime < Game.GameTime)
+                                PedDoGetIn(GetInQUe[0]);
+                        }
+                        else
+                        {
+                            int iBPed = ReteaveBrain(GetInQUe[0].PedLevel);
+                            PedList[iBPed].EnterVehQue = false;
+                            if (PedList[iBPed].ThisBlip != null)
+                                ClearPedBlips(GetInQUe[0].PedLevel);
+                            GetInQUe.RemoveAt(0);
+                        }
+                    }
+                }
+                else if (iRotateFind == 2)
+                {
+                    if (MakeFrenz.Count > 0)
+                    {
+                        if (FindMe == null)
+                        {
+                            if (iFindingTime < Game.GameTime)
+                                FindMe = GetPedPos(MakeFrenz[0].MinRadi, MakeFrenz[0].MaxRadi);
+                        }
+                        else
+                        {
+                            PedRelpace(FindMe, MakeFrenz[0]);
+                            MakeFrenz.RemoveAt(0);
+                            FindMe = null;
+                        }
+                    }
+                }
+                else
+                {
+                    if (MakeCarz.Count > 0)
+                    {
+                        if (FindMe == null)
+                        {
+                            if (iFindingTime < Game.GameTime)
+                                FindMe = GetVehPos(MakeCarz[0].MinRadi, MakeCarz[0].MaxRadi);
+                        }
+                        else
+                        {
+                            VehRelpace(FindMe, MakeCarz[0]);
+                            MakeCarz.RemoveAt(0);
+                            FindMe = null;
+                        }
+                    }
+                    iRotateFind = 0;
+                }  
+            }
         }
     }
 }
