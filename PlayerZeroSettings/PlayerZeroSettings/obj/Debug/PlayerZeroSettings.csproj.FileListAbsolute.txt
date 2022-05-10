@@ -1,0 +1,10 @@
+C:\Users\Ado\source\repos\PlayerZeroSettings\PlayerZeroSettings\bin\Debug\PlayerZeroSettings.exe.config
+C:\Users\Ado\source\repos\PlayerZeroSettings\PlayerZeroSettings\bin\Debug\PlayerZeroSettings.exe
+C:\Users\Ado\source\repos\PlayerZeroSettings\PlayerZeroSettings\bin\Debug\PlayerZeroSettings.pdb
+C:\Users\Ado\source\repos\PlayerZeroSettings\PlayerZeroSettings\obj\Debug\PlayerZeroSettings.csprojAssemblyReference.cache
+C:\Users\Ado\source\repos\PlayerZeroSettings\PlayerZeroSettings\obj\Debug\PlayerZeroSettings.Form1.resources
+C:\Users\Ado\source\repos\PlayerZeroSettings\PlayerZeroSettings\obj\Debug\PlayerZeroSettings.Properties.Resources.resources
+C:\Users\Ado\source\repos\PlayerZeroSettings\PlayerZeroSettings\obj\Debug\PlayerZeroSettings.csproj.GenerateResource.cache
+C:\Users\Ado\source\repos\PlayerZeroSettings\PlayerZeroSettings\obj\Debug\PlayerZeroSettings.csproj.CoreCompileInputs.cache
+C:\Users\Ado\source\repos\PlayerZeroSettings\PlayerZeroSettings\obj\Debug\PlayerZeroSettings.exe
+C:\Users\Ado\source\repos\PlayerZeroSettings\PlayerZeroSettings\obj\Debug\PlayerZeroSettings.pdb
