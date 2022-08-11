@@ -1,0 +1,11 @@
+C:\Users\Ado\source\repos\PlayerZ\PlayerZ\obj\Debug\PlayerZ.csproj.CoreCompileInputs.cache
+C:\Users\Ado\source\repos\PlayerZ\PlayerZ\bin\Debug\ScriptHookVDotNet2.dll
+C:\Users\Ado\source\repos\PlayerZ\PlayerZ\bin\Debug\ScriptHookVDotNet2.pdb
+C:\Users\Ado\source\repos\PlayerZ\PlayerZ\bin\Debug\ScriptHookVDotNet2.xml
+C:\Users\Ado\source\repos\PlayerZ\PlayerZ\obj\Debug\PlayerZ.csproj.CopyComplete
+C:\Users\Ado\source\repos\PlayerZ\PlayerZ\bin\Debug\PlayerZero.dll
+C:\Users\Ado\source\repos\PlayerZ\PlayerZ\bin\Debug\PlayerZero.pdb
+C:\Users\Ado\source\repos\PlayerZ\PlayerZ\obj\Debug\PlayerZero.dll
+C:\Users\Ado\source\repos\PlayerZ\PlayerZ\obj\Debug\PlayerZero.pdb
+C:\Users\Ado\source\repos\PlayerZ\PlayerZ\obj\Debug\PlayerZ.csproj.AssemblyReference.cache
+C:\Users\Ado\source\repos\PlayerZ\PlayerZ\bin\Debug\NativeUI.dll
