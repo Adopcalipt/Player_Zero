@@ -7,7 +7,7 @@ namespace PlayerZero.Classes
     public class IniFile   // revision 11
     {
         string Path;
-        string EXE = "PZSet";
+        string EXE = "Settings";
 
         [DllImport("kernel32", CharSet = CharSet.Unicode)]
         static extern long WritePrivateProfileString(string Section, string Key, string Value, string FilePath);
@@ -17,7 +17,7 @@ namespace PlayerZero.Classes
 
         public IniFile()
         {
-            Path = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/PZSet.ini";
+            Path = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/Settings.ini";
         }
         public string Read(string Key, string Section = null)
         {

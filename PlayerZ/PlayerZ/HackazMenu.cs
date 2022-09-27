@@ -1,8 +1,8 @@
 ﻿using GTA;
 using GTA.Math;
 using GTA.Native;
-using PlayerZero.Classes;
 using System.Collections.Generic;
+using PlayerZero.Classes;
 using NativeUI; 
 
 namespace PlayerZero
@@ -49,10 +49,10 @@ namespace PlayerZero
             var mainMenu = new UIMenu("HackarZ Menu", "");
             PzPool.Add(mainMenu);
 
-            ClearSession(mainMenu);
-            InviteOnly(mainMenu);
             TrollPlayerzMenu(mainMenu);
             AddWindMill(mainMenu);
+            if (DataStore.PlayContList.PedBrain.Count > 0)
+                ContackzMenu(mainMenu);
             SetPlayerAgg(mainMenu);
             SetPlayerNumb(mainMenu);
             MinWait(mainMenu);
@@ -61,41 +61,14 @@ namespace PlayerZero
             MaxSession(mainMenu);
             PlayerMinAcc(mainMenu);
             PlayerMaxAcc(mainMenu);
+            ClearSession(mainMenu);
+            InviteOnly(mainMenu);
+            SetNotify(mainMenu);
+            SetBlipies(mainMenu);
 
             PzPool.RefreshIndex();
             DataStore.bMenuOpen = true;
             mainMenu.Visible = !mainMenu.Visible;
-        }
-        private static void AddWindMill(UIMenu XMen)
-        {
-            LoggerLight.GetLogging("AddWindMill");
-
-            string sTitle = "Add eclipse windMill";
-            if (DataStore.bEclipceWind)
-                sTitle = "Remove eclipse windMill";
-            var addWindmill = new UIMenuItem(sTitle, "");
-            XMen.AddItem(addWindmill);
-
-            XMen.OnItemSelect += (sender, item, index) =>
-            {
-                if (item == addWindmill)
-                {
-                    if (DataStore.bEclipceWind)
-                    {
-                        for (int i = 0; i < DataStore.Plops.Count; i++)
-                        {
-                            DataStore.Plops[i].MarkAsNoLongerNeeded();
-                            DataStore.bEclipceWind = false;
-                        }
-                        addWindmill.Text = "Add eclipse windMill";
-                    }
-                    else
-                    {
-                        PedActions.AddEclipsWindMill();
-                        addWindmill.Text = "Remove eclipse windMill";
-                    }
-                }
-            };
         }
         private static void ClearSession(UIMenu XMen)
         {
@@ -107,8 +80,7 @@ namespace PlayerZero
             {
                 if (item == ClearSesh)
                 {
-                    PedActions.LaggOut();
-                    DataStore.bMenuOpen = false;
+                    PlayerAI.LaggOut();
                     PzPool.CloseAllMenus();
                 }
             };
@@ -128,168 +100,9 @@ namespace PlayerZero
                 if (item == inviteOnly)
                 {
                     DataStore.bDisabled = !DataStore.bDisabled;
-                    DataStore.bMenuOpen = false;
+                    if (DataStore.bScan)
+                        DataStore.bScan = false;
                     PzPool.CloseAllMenus();
-                }
-            };
-        }
-        private static void SetPlayerAgg(UIMenu XMen)
-        {
-            LoggerLight.GetLogging("SetPlayerAgg");
-
-            List<dynamic> AggList = new List<dynamic>();
-
-            int iCount = 12;
-            CompileMenuTotals(AggList, iCount, 1);
-            var Aggroitem = new UIMenuListItem("Player agression", AggList, 0);
-            Aggroitem.Index = DataStore.MySettings.iAggression - 1;
-            XMen.AddItem(Aggroitem);
-
-            XMen.OnListChange += (sender, item, index) =>
-            {
-                if (item == Aggroitem)
-                {
-                    DataStore.MySettings.iAggression = index + 1;
-                }
-            };
-        }
-        private static void SetPlayerNumb(UIMenu XMen)
-        {
-            LoggerLight.GetLogging("SetPlayerNumb");
-
-            List<dynamic> NumbList = new List<dynamic>();
-
-            int iCount = 30;
-            CompileMenuTotals(NumbList, iCount, 5);
-            var Numbitem = new UIMenuListItem("Players in session", NumbList, 0);
-            Numbitem.Index = DataStore.MySettings.iMaxPlayers - 5;
-            XMen.AddItem(Numbitem);
-
-            XMen.OnListChange += (sender, item, index) =>
-            {
-                if (item == Numbitem)
-                {
-                    DataStore.MySettings.iMaxPlayers = index + 5;
-                }
-            };
-        }
-        private static void MinWait(UIMenu XMen)
-        {
-            LoggerLight.GetLogging("MinWait");
-
-            List<dynamic> MinWaitList = new List<dynamic>();
-
-            int iCount = SecondMiniute(false, DataStore.MySettings.iMaxWait, false) + 1;
-            CompileMenuTotals(MinWaitList, iCount, 1);
-            var MinSeshitem = new UIMenuListItem("Min login time (sec)", MinWaitList, 1);
-            MinSeshitem.Index = SecondMiniute(false, DataStore.MySettings.iMinWait, false) - 1;
-            XMen.AddItem(MinSeshitem);
-
-            XMen.OnListChange += (sender, item, index) =>
-            {
-                if (item == MinSeshitem)
-                {
-                    DataStore.MySettings.iMinWait = SecondMiniute(false, index, true) + 1;
-                }
-            };
-        }
-        private static void MaxWait(UIMenu XMen)
-        {
-            LoggerLight.GetLogging("MaxWait");
-
-            List<dynamic> MaxWaitList = new List<dynamic>();
-
-            int iCount = 542;
-            CompileMenuTotals(MaxWaitList, iCount, 1);
-            var MaxSeshitem = new UIMenuListItem("Max login time (sec)", MaxWaitList, 1);
-            MaxSeshitem.Index = SecondMiniute(false, DataStore.MySettings.iMaxWait, false) - 1;
-            XMen.AddItem(MaxSeshitem);
-
-            XMen.OnListChange += (sender, item, index) =>
-            {
-                if (item == MaxSeshitem)
-                {
-                    DataStore.MySettings.iMinWait = SecondMiniute(false, index, true) + 1;
-                }
-            };
-        }
-        private static void MinSession(UIMenu XMen)
-        {
-            LoggerLight.GetLogging("MinSession");
-
-            List<dynamic> MinSeshList = new List<dynamic>();
-
-            int iCount = SecondMiniute(true, DataStore.MySettings.iMaxSession, false) + 1;
-            CompileMenuTotals(MinSeshList, iCount, 1);
-            var MinSeshitem = new UIMenuListItem("Min session time (min)", MinSeshList, 1);
-            MinSeshitem.Index = SecondMiniute(true, DataStore.MySettings.iMinSession, false) - 1;
-            XMen.AddItem(MinSeshitem);
-
-            XMen.OnListChange += (sender, item, index) =>
-            {
-                if (item == MinSeshitem)
-                {
-                    DataStore.MySettings.iMinSession = SecondMiniute(true, index, true) + 1;
-                }
-            };
-        }
-        private static void MaxSession(UIMenu XMen)
-        {
-            LoggerLight.GetLogging("MaxWait");
-
-            List<dynamic> MaxWaitList = new List<dynamic>();
-
-            int iCount = 542;
-            CompileMenuTotals(MaxWaitList, iCount, 1);
-            var MaxSeshitem = new UIMenuListItem("Max session time (min)", MaxWaitList, 1);
-            MaxSeshitem.Index = SecondMiniute(true, DataStore.MySettings.iMaxSession, false) - 1;
-            XMen.AddItem(MaxSeshitem);
-
-            XMen.OnListChange += (sender, item, index) =>
-            {
-                if (item == MaxSeshitem)
-                {
-                    DataStore.MySettings.iMaxSession = SecondMiniute(true, index, true) + 1;
-                }
-            };
-        }
-        private static void PlayerMinAcc(UIMenu XMen)
-        {
-            LoggerLight.GetLogging("PlayerMinAcc");
-
-            List<dynamic> MinAccList = new List<dynamic>();
-
-            int iCount = DataStore.MySettings.iAccMax + 1;
-            CompileMenuTotals(MinAccList, iCount, 1);
-            var MinAcc = new UIMenuListItem("Player aim accuracy minimum", MinAccList, 1);
-            MinAcc.Index = DataStore.MySettings.iAccMin - 1;
-            XMen.AddItem(MinAcc);
-
-            XMen.OnListChange += (sender, item, index) =>
-            {
-                if (item == MinAcc)
-                {
-                    DataStore.MySettings.iAccMin = index + 1;
-                }
-            };
-        }
-        private static void PlayerMaxAcc(UIMenu XMen)
-        {
-            LoggerLight.GetLogging("PlayerMaxAcc");
-
-            List<dynamic> MaxAccList = new List<dynamic>();
-
-            int iCount = 100;
-            CompileMenuTotals(MaxAccList, iCount, 1);
-            var MaxAcc = new UIMenuListItem("Player aim accuracy maximum", MaxAccList, 1);
-            MaxAcc.Index = DataStore.MySettings.iAccMax - 1;
-            XMen.AddItem(MaxAcc);
-
-            XMen.OnListChange += (sender, item, index) =>
-            {
-                if (item == MaxAcc)
-                {
-                    DataStore.MySettings.iAccMax = index + 1;
                 }
             };
         }
@@ -322,12 +135,302 @@ namespace PlayerZero
                 if (sender == trollinList)
                 {
                     DataStore.bMenuOpen = false;
-                    PzPool.CloseAllMenus();
+                    Vehicle Vhich = null;  
 
                     if (index < iCount)
-                        TrollList(Playerz[index]);
+                    {
+                        Vhich = DataStore.PedList[index].ThisVeh;
+                        TrollList(Playerz[index], Vhich);
+                    }
                     else
                         TrolAfkerslList(Playerz[index]);
+                }
+            };
+        }
+        private static void ContackzMenu(UIMenu XMen)
+        {
+            LoggerLight.GetLogging("ContackzMenu");
+
+            var trollinList = PzPool.AddSubMenu(XMen, "Contacts");
+
+            List<string> PlayerzId = new List<string>();
+            int iCount = 0;
+
+            for (int i = 0; i < DataStore.PlayContList.PedBrain.Count; i++)
+            {
+                PlayerzId.Add(DataStore.PlayContList.PedBrain[i].MyIdentity);
+                var newitem = new UIMenuItem(DataStore.PlayContList.PedBrain[i].MyName);
+                trollinList.AddItem(newitem);
+                iCount++;
+            }
+
+            trollinList.OnItemSelect += (sender, item, index) =>
+            {
+                if (sender == trollinList)
+                {
+                    DataStore.bMenuOpen = false;
+                    MyContactMenu(PlayerzId[index]);
+                }
+            };
+        }
+        private static void MyContactMenu(string sMyId)
+        {
+            LoggerLight.GetLogging("MyContactMenu sMyId == " + sMyId);
+
+            int iPlace = PlayerAI.ReteveContact(sMyId);
+            if (iPlace != -1)
+            {
+                PzPool = new MenuPool();
+                var contMenu = new UIMenu(DataStore.PlayContList.PedBrain[iPlace].MyName, "");
+                PzPool.Add(contMenu);
+
+                RemovePed(contMenu, sMyId);
+
+                PzPool.RefreshIndex();
+                DataStore.bMenuOpen = true;
+                contMenu.Visible = !contMenu.Visible;
+            }
+        }
+        private static void RemovePed(UIMenu XMen, string sMyId)
+        {
+            LoggerLight.GetLogging("RemovePed");
+            var comehere = new UIMenuItem("Remove player contact", "");
+            XMen.AddItem(comehere);
+
+            XMen.OnItemSelect += (sender, item, index) =>
+            {
+                OnlinePlayerz.RemoveMyFriend(sMyId);
+                PzPool.CloseAllMenus();
+            };
+        }
+        private static void AddWindMill(UIMenu XMen)
+        {
+            LoggerLight.GetLogging("AddWindMill");
+
+            string sTitle = "Add eclipse windMill";
+            if (DataStore.WindMill != null)
+                sTitle = "Remove eclipse windMill";
+            var addWindmill = new UIMenuItem(sTitle, "");
+            XMen.AddItem(addWindmill);
+
+            XMen.OnItemSelect += (sender, item, index) =>
+            {
+                if (item == addWindmill)
+                {
+                    PedActions.EclipsWindMill();
+
+                    if (DataStore.WindMill == null)
+                        addWindmill.Text = "Add eclipse windMill";
+                    else
+                        addWindmill.Text = "Remove eclipse windMill";
+                }
+            };
+        }
+        private static void SetNotify(UIMenu XMen)
+        {
+            LoggerLight.GetLogging("SetNotify");
+
+            string sTitle = "Add Notification";
+            if (!DataStore.MySettings.NoNotify)
+                sTitle = "Remove Notification";
+            var notes = new UIMenuItem(sTitle, "");
+            XMen.AddItem(notes);
+
+            XMen.OnItemSelect += (sender, item, index) =>
+            {
+                if (item == notes)
+                {
+                    DataStore.MySettings.NoNotify = !DataStore.MySettings.NoNotify;
+                    if (DataStore.MySettings.NoNotify)
+                        notes.Text = "Add Notification";
+                    else
+                        notes.Text = "Remove Notification";
+                }
+            };
+        }
+        private static void SetBlipies(UIMenu XMen)
+        {
+            LoggerLight.GetLogging("SetNotify");
+
+            string sTitle = "Player Blips On";
+            if (!DataStore.MySettings.NoRadar)
+                sTitle = "Player Blips Off";
+            var radar = new UIMenuItem(sTitle, "");
+            XMen.AddItem(radar);
+
+            XMen.OnItemSelect += (sender, item, index) =>
+            {
+                if (item == radar)
+                {
+                    DataStore.MySettings.NoRadar = !DataStore.MySettings.NoRadar;
+                    if (DataStore.MySettings.NoRadar)
+                    {
+                        PlayerAI.NoMoreBlips();
+                        radar.Text = "Player Blips On";
+                    }
+                    else
+                        radar.Text = "Player Blips Off";
+                }
+            };
+        }
+        private static void SetPlayerAgg(UIMenu XMen)
+        {
+            LoggerLight.GetLogging("SetPlayerAgg");
+
+            List<dynamic> AggList = new List<dynamic>();
+
+            int iCount = 12;
+            CompileMenuTotals(AggList, iCount, 1);
+            var Aggroitem = new UIMenuListItem("Player agression", AggList, 0);
+            Aggroitem.Index = DataStore.MySettings.Aggression - 1;
+            XMen.AddItem(Aggroitem);
+
+            XMen.OnListChange += (sender, item, index) =>
+            {
+                if (item == Aggroitem)
+                {
+                    DataStore.MySettings.Aggression = index + 1;
+                }
+            };
+        }
+        private static void SetPlayerNumb(UIMenu XMen)
+        {
+            LoggerLight.GetLogging("SetPlayerNumb");
+
+            List<dynamic> NumbList = new List<dynamic>();
+
+            int iCount = 30;
+            CompileMenuTotals(NumbList, iCount, 5);
+            var Numbitem = new UIMenuListItem("Players in session", NumbList, 0);
+            Numbitem.Index = DataStore.MySettings.MaxPlayers - 5;
+            XMen.AddItem(Numbitem);
+
+            XMen.OnListChange += (sender, item, index) =>
+            {
+                if (item == Numbitem)
+                {
+                    DataStore.MySettings.MaxPlayers = index + 5;
+                }
+            };
+        }
+        private static void MinWait(UIMenu XMen)
+        {
+            LoggerLight.GetLogging("MinWait");
+
+            List<dynamic> MinWaitList = new List<dynamic>();
+
+            int iCount = SecondMiniute(false, DataStore.MySettings.MaxWait, false) + 1;
+            CompileMenuTotals(MinWaitList, iCount, 1);
+            var MinSeshitem = new UIMenuListItem("Min login time (sec)", MinWaitList, 1);
+            MinSeshitem.Index = SecondMiniute(false, DataStore.MySettings.MinWait, false) - 1;
+            XMen.AddItem(MinSeshitem);
+
+            XMen.OnListChange += (sender, item, index) =>
+            {
+                if (item == MinSeshitem)
+                {
+                    DataStore.MySettings.MinWait = SecondMiniute(false, index, true) + 1;
+
+                }
+            };
+        }
+        private static void MaxWait(UIMenu XMen)
+        {
+            LoggerLight.GetLogging("MaxWait");
+
+            List<dynamic> MaxWaitList = new List<dynamic>();
+
+            int iCount = 542;
+            CompileMenuTotals(MaxWaitList, iCount, 1);
+            var MaxSeshitem = new UIMenuListItem("Max login time (sec)", MaxWaitList, 1);
+            MaxSeshitem.Index = SecondMiniute(false, DataStore.MySettings.MaxWait, false) - 1;
+            XMen.AddItem(MaxSeshitem);
+
+            XMen.OnListChange += (sender, item, index) =>
+            {
+                if (item == MaxSeshitem)
+                {
+                    DataStore.MySettings.MaxWait = SecondMiniute(false, index, true) + 1;
+                }
+            };
+        }
+        private static void MinSession(UIMenu XMen)
+        {
+            LoggerLight.GetLogging("MinSession");
+
+            List<dynamic> MinSeshList = new List<dynamic>();
+
+            int iCount = SecondMiniute(true, DataStore.MySettings.MaxSession, false) + 1;
+            CompileMenuTotals(MinSeshList, iCount, 1);
+            var MinSeshitem = new UIMenuListItem("Min session time (min)", MinSeshList, 1);
+            MinSeshitem.Index = SecondMiniute(true, DataStore.MySettings.MinSession, false) - 1;
+            XMen.AddItem(MinSeshitem);
+
+            XMen.OnListChange += (sender, item, index) =>
+            {
+                if (item == MinSeshitem)
+                {
+                    DataStore.MySettings.MinSession = SecondMiniute(true, index, true) + 1;
+                }
+            };
+        }
+        private static void MaxSession(UIMenu XMen)
+        {
+            LoggerLight.GetLogging("MaxWait");
+
+            List<dynamic> MaxWaitList = new List<dynamic>();
+
+            int iCount = 542;
+            CompileMenuTotals(MaxWaitList, iCount, 1);
+            var MaxSeshitem = new UIMenuListItem("Max session time (min)", MaxWaitList, 1);
+            MaxSeshitem.Index = SecondMiniute(true, DataStore.MySettings.MaxSession, false) - 1;
+            XMen.AddItem(MaxSeshitem);
+
+            XMen.OnListChange += (sender, item, index) =>
+            {
+                if (item == MaxSeshitem)
+                {
+                    DataStore.MySettings.MaxSession = SecondMiniute(true, index, true) + 1;
+                }
+            };
+        }
+        private static void PlayerMinAcc(UIMenu XMen)
+        {
+            LoggerLight.GetLogging("PlayerMinAcc");
+
+            List<dynamic> MinAccList = new List<dynamic>();
+
+            int iCount = DataStore.MySettings.AccMax + 1;
+            CompileMenuTotals(MinAccList, iCount, 1);
+            var MinAcc = new UIMenuListItem("Player aim accuracy minimum", MinAccList, 1);
+            MinAcc.Index = DataStore.MySettings.AccMin - 1;
+            XMen.AddItem(MinAcc);
+
+            XMen.OnListChange += (sender, item, index) =>
+            {
+                if (item == MinAcc)
+                {
+                    DataStore.MySettings.AccMin = index + 1;
+                }
+            };
+        }
+        private static void PlayerMaxAcc(UIMenu XMen)
+        {
+            LoggerLight.GetLogging("PlayerMaxAcc");
+
+            List<dynamic> MaxAccList = new List<dynamic>();
+
+            int iCount = 100;
+            CompileMenuTotals(MaxAccList, iCount, 1);
+            var MaxAcc = new UIMenuListItem("Player aim accuracy maximum", MaxAccList, 1);
+            MaxAcc.Index = DataStore.MySettings.AccMax - 1;
+            XMen.AddItem(MaxAcc);
+
+            XMen.OnListChange += (sender, item, index) =>
+            {
+                if (item == MaxAcc)
+                {
+                    DataStore.MySettings.AccMax = index + 1;
                 }
             };
         }
@@ -348,14 +451,14 @@ namespace PlayerZero
                 OrbitalStrikeOnPed(trollPMenu, iPedId, true);
                 PiggyBack(trollPMenu, iPedId, true);
                 AddBountyPed(trollPMenu, iPedId, true);
-                //MoneyDropOnPed(trollPMenu, iPedId, true);
+                MoneyDropOnPed(trollPMenu, iPedId, true);
 
                 PzPool.RefreshIndex();
                 DataStore.bMenuOpen = true;
                 trollPMenu.Visible = !trollPMenu.Visible;
             }
         }
-        private static void TrollList(int iPedId)
+        private static void TrollList(int iPedId, Vehicle hasVeh)
         {
             LoggerLight.GetLogging("TrollList iPedId == " + iPedId);
 
@@ -366,12 +469,14 @@ namespace PlayerZero
                 PzPool.Add(trollPMenu);
 
                 BringPed(trollPMenu, iPedId, false);
+                if (ReturnValues.HasASeat(hasVeh))
+                    EnterPeddVeh(trollPMenu, iPedId, hasVeh);
                 BurnPed(trollPMenu, iPedId, false);
                 CrashPed(trollPMenu, iPedId, false);
                 DropObjectOnPed(trollPMenu, iPedId, false);
                 OrbitalStrikeOnPed(trollPMenu, iPedId, false);
                 PiggyBack(trollPMenu, iPedId, false);
-                //MoneyDropOnPed(trollPMenu, iPedId, false);
+                MoneyDropOnPed(trollPMenu, iPedId, false);
                 AddBountyPed(trollPMenu, iPedId, false);
 
                 PzPool.RefreshIndex();
@@ -396,17 +501,50 @@ namespace PlayerZero
                         {
                             DataStore.AFKList[iPedId].ThisBlip.Remove();
                             string sNAmes = DataStore.AFKList[iPedId].MyName;
-                            DataStore.AFKList.RemoveAt(iPedId);
+                            int iLev = DataStore.AFKList[iPedId].Level;
+                            PlayerAI.RemoveFromAFKList(iPedId);
 
-                            PedActions.GenPlayerPed(LandHere, ReturnValues.RandInt(1, 360), null, 0, -1, sNAmes);
+                            PlayerBrain newBrain = new PlayerBrain();
+                            newBrain.PFMySetting = FreemodePed.MakeFaces();
+                            newBrain.MyName = sNAmes;
+                            newBrain.Level = iLev;
+                            newBrain.TimeOn = Game.GameTime + RandomNum.RandInt(DataStore.MySettings.MinSession, DataStore.MySettings.MaxSession);
+                            newBrain.Friendly = false;
+
+                            Ped MyPed = BuildObjects.GenPlayerPed(LandHere, RandomNum.RandInt(0, 360), newBrain);
                         }
                     }
                     else
                     {
                         if (iPedId < DataStore.PedList.Count)
-                            DataStore.PedList[iPedId].ThisPed.Position = LandHere;
+                        {
+                            if (DataStore.PedList[iPedId].ThisPed != null)
+                            {
+                                DataStore.PedList[iPedId].ThisPed.Position = LandHere;
+                                DataStore.PedList[iPedId].ApprochPlayer = true;
+                                DataStore.PedList[iPedId].Driver = false;
+                                DataStore.PedList[iPedId].Passenger = false;
+                            }
+                        }
                     }
-                    DataStore.bMenuOpen = false;
+                    PzPool.CloseAllMenus();
+                }
+            };
+        }
+        private static void EnterPeddVeh(UIMenu XMen, int iPedId, Vehicle vHick)
+        {
+            LoggerLight.GetLogging("BringPed");
+            var comehere = new UIMenuItem("Enter Players Vehicle", "");
+            XMen.AddItem(comehere);
+
+            XMen.OnItemSelect += (sender, item, index) =>
+            {
+                if (item == comehere)
+                {
+                    if (iPedId < DataStore.PedList.Count)
+                    {
+                        PedActions.PlayerEnterVeh(vHick, true);
+                    }
                     PzPool.CloseAllMenus();
                 }
             };
@@ -425,7 +563,7 @@ namespace PlayerZero
                     {
                         if (iPedId < DataStore.AFKList.Count)
                         {
-                            UI.Notify(DataStore.AFKList[iPedId].MyName + " died");
+                            ScaleDisp.BottomLeft(DataStore.AFKList[iPedId].MyName + " died");
                             DataStore.AFKList[iPedId].TimeOn = 0;
                         }
                     }
@@ -433,27 +571,31 @@ namespace PlayerZero
                     {
                         if (iPedId < DataStore.PedList.Count)
                         {
-                            Function.Call(Hash.START_ENTITY_FIRE, DataStore.PedList[iPedId].ThisPed);
-                            ClearUp.ClearPedBlips(DataStore.PedList[iPedId].Level);
-                            DataStore.PedList[iPedId].Colours = 1;
-                            if (DataStore.MySettings.iAggression < 5)
-                                DataStore.PedList[iPedId].TimeOn = Game.GameTime + 120000;
-                            else
-                                DataStore.PedList[iPedId].TimeOn += 120000;
-
-                            PedActions.FightPlayer(DataStore.PedList[iPedId].ThisPed, false);
-                            DataStore.PedList[iPedId].Friendly = false;
-                            if (DataStore.PedList[iPedId].Follower)
+                            if (DataStore.PedList[iPedId].ThisPed != null)
                             {
-                                Function.Call(Hash.REMOVE_PED_FROM_GROUP, DataStore.PedList[iPedId].ThisPed.Handle);
-                                DataStore.PedList[iPedId].Follower = false;
-                                DataStore.iFollow -= 1;
+                                Function.Call(Hash.START_ENTITY_FIRE, DataStore.PedList[iPedId].ThisPed);
+                                ClearUp.ClearPedBlips(DataStore.PedList[iPedId].MyIdentity);
+                                DataStore.PedList[iPedId].BlipColour = 1;
+                                if (DataStore.MySettings.Aggression < 5)
+                                    DataStore.PedList[iPedId].TimeOn = Game.GameTime + 120000;
+                                else
+                                    DataStore.PedList[iPedId].TimeOn += 120000;
+
+                                PedActions.FightPlayer(DataStore.PedList[iPedId].ThisPed, false);
+                                DataStore.PedList[iPedId].Friendly = false;
+                                if (DataStore.PedList[iPedId].Follower)
+                                {
+                                    if (PlayerAI.ReteveContact(DataStore.PedList[iPedId].MyIdentity) != -1)
+                                        OnlinePlayerz.RemoveMyFriend(DataStore.PedList[iPedId].MyIdentity);
+                                    Function.Call(Hash.REMOVE_PED_FROM_GROUP, DataStore.PedList[iPedId].ThisPed.Handle);
+                                    DataStore.PedList[iPedId].Follower = false;
+                                    DataStore.iFollow -= 1;
+                                }
+                                DataStore.PedList[iPedId].DirBlip = BuildObjects.DirectionalBlimp(DataStore.PedList[iPedId].ThisPed);
+                                DataStore.PedList[iPedId].ThisBlip = BuildObjects.PedBlimp(DataStore.PedList[iPedId].ThisPed, 1, DataStore.PedList[iPedId].MyName, DataStore.PedList[iPedId].BlipColour);
                             }
-                            DataStore.PedList[iPedId].DirBlip = BlipActions.DirectionalBlimp(DataStore.PedList[iPedId].ThisPed);
-                            DataStore.PedList[iPedId].ThisBlip = BlipActions.PedBlimp(DataStore.PedList[iPedId].ThisPed, 1, DataStore.PedList[iPedId].MyName, DataStore.PedList[iPedId].Colours);
                         }
                     }
-                    DataStore.bMenuOpen = false;
                     PzPool.CloseAllMenus();
                 }
             };
@@ -477,8 +619,10 @@ namespace PlayerZero
                     {
                         if (iPedId < DataStore.PedList.Count)
                             DataStore.PedList[iPedId].TimeOn = 0;
+
+                        if (PlayerAI.ReteveContact(DataStore.PedList[iPedId].MyIdentity) != -1)
+                            OnlinePlayerz.RemoveMyFriend(DataStore.PedList[iPedId].MyIdentity);
                     }
-                    DataStore.bMenuOpen = false;
                     PzPool.CloseAllMenus();
                 }
             };
@@ -501,29 +645,34 @@ namespace PlayerZero
                     {
                         if (iPedId < DataStore.PedList.Count)
                         {
-                            Vector3 Above = DataStore.PedList[iPedId].ThisPed.Position + (DataStore.PedList[iPedId].ThisPed.ForwardVector * 3);
-                            Above.Z = Above.Z + 10;
-                            PedActions.DropObjects(Above);
-                            ClearUp.ClearPedBlips(DataStore.PedList[iPedId].Level);
-                            DataStore.PedList[iPedId].Colours = 1;
-                            if (DataStore.MySettings.iAggression < 5)
-                                DataStore.PedList[iPedId].TimeOn = Game.GameTime + 120000;
-                            else
-                                DataStore.PedList[iPedId].TimeOn += 120000;
-
-                            PedActions.FightPlayer(DataStore.PedList[iPedId].ThisPed, false);
-                            DataStore.PedList[iPedId].Friendly = false;
-                            if (DataStore.PedList[iPedId].Follower)
+                            if (DataStore.PedList[iPedId].ThisPed != null)
                             {
-                                Function.Call(Hash.REMOVE_PED_FROM_GROUP, DataStore.PedList[iPedId].ThisPed.Handle);
-                                DataStore.PedList[iPedId].Follower = false;
-                                DataStore.iFollow -= 1;
+                                Vector3 Above = DataStore.PedList[iPedId].ThisPed.Position + (DataStore.PedList[iPedId].ThisPed.ForwardVector * 3);
+                                Above.Z = Above.Z + 10;
+                                BuildObjects.DropObjects(Above);
+                                ClearUp.ClearPedBlips(DataStore.PedList[iPedId].MyIdentity);
+                                DataStore.PedList[iPedId].BlipColour = 1;
+                                if (DataStore.MySettings.Aggression < 5)
+                                    DataStore.PedList[iPedId].TimeOn = Game.GameTime + 120000;
+                                else
+                                    DataStore.PedList[iPedId].TimeOn += 120000;
+
+                                PedActions.FightPlayer(DataStore.PedList[iPedId].ThisPed, false);
+                                DataStore.PedList[iPedId].Friendly = false;
+                                if (DataStore.PedList[iPedId].Follower)
+                                {
+                                    if (PlayerAI.ReteveContact(DataStore.PedList[iPedId].MyIdentity) != -1)
+                                        OnlinePlayerz.RemoveMyFriend(DataStore.PedList[iPedId].MyIdentity);
+
+                                    Function.Call(Hash.REMOVE_PED_FROM_GROUP, DataStore.PedList[iPedId].ThisPed.Handle);
+                                    DataStore.PedList[iPedId].Follower = false;
+                                    DataStore.iFollow -= 1;
+                                }
+                                DataStore.PedList[iPedId].DirBlip = BuildObjects.DirectionalBlimp(DataStore.PedList[iPedId].ThisPed);
+                                DataStore.PedList[iPedId].ThisBlip = BuildObjects.PedBlimp(DataStore.PedList[iPedId].ThisPed, 1, DataStore.PedList[iPedId].MyName, DataStore.PedList[iPedId].BlipColour);
                             }
-                            DataStore.PedList[iPedId].DirBlip = BlipActions.DirectionalBlimp(DataStore.PedList[iPedId].ThisPed);
-                            DataStore.PedList[iPedId].ThisBlip = BlipActions.PedBlimp(DataStore.PedList[iPedId].ThisPed, 1, DataStore.PedList[iPedId].MyName, DataStore.PedList[iPedId].Colours);
                         }
                     }
-                    DataStore.bMenuOpen = false;
                     PzPool.CloseAllMenus();
                 }
             };
@@ -546,18 +695,29 @@ namespace PlayerZero
                     {
                         if (iPedId < DataStore.PedList.Count)
                         {
-                            PedActions.FireOrb(DataStore.PedList[iPedId].Level, DataStore.PedList[iPedId].ThisPed, true);
-                            if (DataStore.PedList[iPedId].Bounty)
-                                Game.Player.Money += 7000;
-                            DataStore.PedList[iPedId].Friendly = false;
-                            DataStore.PedList[iPedId].Colours = 1;
-                            DataStore.PedList[iPedId].ApprochPlayer = false;
-                            Function.Call(Hash.REMOVE_PED_FROM_GROUP, DataStore.PedList[iPedId].ThisPed.Handle);
-                            DataStore.PedList[iPedId].Follower = false;
-                            DataStore.PedList[iPedId].Killed += 1;
+                            if (DataStore.PedList[iPedId].ThisPed != null)
+                            {
+                                PedActions.FireOrb(DataStore.PedList[iPedId].MyIdentity, DataStore.PedList[iPedId].ThisPed, true);
+                                if (DataStore.PedList[iPedId].Bounty)
+                                    Game.Player.Money += 7000;
+                                if (DataStore.PedList[iPedId].Follower)
+                                {
+                                    if (PlayerAI.ReteveContact(DataStore.PedList[iPedId].MyIdentity) != -1)
+                                        OnlinePlayerz.RemoveMyFriend(DataStore.PedList[iPedId].MyIdentity);
+
+                                    DataStore.PedList[iPedId].Follower = false;
+                                    DataStore.iFollow -= 1;
+                                }
+                                DataStore.PedList[iPedId].Friendly = false;
+                                DataStore.PedList[iPedId].BlipColour = 1;
+                                DataStore.PedList[iPedId].ApprochPlayer = false;
+                                DataStore.PedList[iPedId].Killed ++;
+                                Function.Call(Hash.REMOVE_PED_FROM_GROUP, DataStore.PedList[iPedId].ThisPed.Handle);
+                                DataStore.PedList[iPedId].DeathSequence = 1;
+                                DataStore.PedList[iPedId].DeathTime = Game.GameTime + 10000;
+                            }
                         }
                     }
-                    DataStore.bMenuOpen = false;
                     PzPool.CloseAllMenus();
                 }
             };
@@ -579,9 +739,14 @@ namespace PlayerZero
 
                         DataStore.AFKList[iPedId].ThisBlip.Remove();
                         string sNAmes = DataStore.AFKList[iPedId].MyName;
-                        DataStore.AFKList.RemoveAt(iPedId);
+                        PlayerAI.RemoveFromAFKList(iPedId);
 
-                        Ped MyPed = PedActions.GenPlayerPed(LandHere, ReturnValues.RandInt(1, 360), null, 0, -1, sNAmes);
+                        PlayerBrain newBrain = new PlayerBrain();
+                        newBrain.PFMySetting = FreemodePed.MakeFaces();
+                        newBrain.MyName = ReturnValues.SillyNameList();
+                        newBrain.Friendly = false;
+
+                        Ped MyPed = BuildObjects.GenPlayerPed(LandHere, RandomNum.RandInt(0, 360), newBrain);
 
                         PedActions.ForceAnim(Peddy, "amb@code_human_in_bus_passenger_idles@female@sit@idle_a", "idle_a", Peddy.Position, Peddy.Rotation);
                         Peddy.AttachTo(MyPed, 31086, new Vector3(0.10f, 0.15f, 0.61f), new Vector3(0.00f, 0.00f, 180.00f));
@@ -591,12 +756,14 @@ namespace PlayerZero
                     {
                         if (iPedId < DataStore.PedList.Count)
                         {
-                            PedActions.ForceAnim(Peddy, "amb@code_human_in_bus_passenger_idles@female@sit@idle_a", "idle_a", Peddy.Position, Peddy.Rotation);
-                            Peddy.AttachTo(DataStore.PedList[iPedId].ThisPed, 31086, new Vector3(0.10f, 0.15f, 0.61f), new Vector3(0.00f, 0.00f, 180.00f));
-                            DataStore.bPlayerPiggyBack = true;
+                            if (DataStore.PedList[iPedId].ThisPed != null)
+                            {
+                                PedActions.ForceAnim(Peddy, "amb@code_human_in_bus_passenger_idles@female@sit@idle_a", "idle_a", Peddy.Position, Peddy.Rotation);
+                                Peddy.AttachTo(DataStore.PedList[iPedId].ThisPed, 31086, new Vector3(0.10f, 0.15f, 0.61f), new Vector3(0.00f, 0.00f, 180.00f));
+                                DataStore.bPlayerPiggyBack = true;
+                            }
                         }
                     }
-                    DataStore.bMenuOpen = false;
                     PzPool.CloseAllMenus();
                 }
             };
@@ -611,7 +778,20 @@ namespace PlayerZero
             {
                 if (item == moneyDrops)
                 {
-                    DataStore.bMenuOpen = false;
+                    if (bAfk)
+                    {
+
+                    }
+                    else
+                    {
+                        if (DataStore.PedList[iPedId].ThisPed != null)
+                        {
+                            ClearUp.ClearProps();
+
+                            DataStore.sMoneyPicker = DataStore.PedList[iPedId].MyIdentity;
+                            DataStore.iMoneyDrops = Game.GameTime + RandomNum.RandInt(4000, 8000);
+                        }
+                    }
                     PzPool.CloseAllMenus();
                 }
             };
@@ -635,21 +815,23 @@ namespace PlayerZero
                     {
                         if (iPedId < DataStore.PedList.Count)
                         {
-                            if (DataStore.PedList[iPedId].ThisBlip != null)
+                            if (DataStore.PedList[iPedId].ThisPed != null)
                             {
-                                DataStore.PedList[iPedId].ThisBlip.Remove();
-                                DataStore.PedList[iPedId].ThisBlip = null;
+                                if (DataStore.PedList[iPedId].ThisBlip != null)
+                                {
+                                    DataStore.PedList[iPedId].ThisBlip.Remove();
+                                    DataStore.PedList[iPedId].ThisBlip = null;
+                                }
+                                if (DataStore.PedList[iPedId].DirBlip != null)
+                                {
+                                    DataStore.PedList[iPedId].DirBlip.Remove();
+                                    DataStore.PedList[iPedId].DirBlip = null;
+                                }
+                                DataStore.PedList[iPedId].ThisBlip = BuildObjects.PedBlimp(DataStore.PedList[iPedId].ThisPed, 303, DataStore.PedList[iPedId].MyName, 1);
+                                DataStore.PedList[iPedId].Bounty = true;
                             }
-                            if (DataStore.PedList[iPedId].DirBlip != null)
-                            {
-                                DataStore.PedList[iPedId].DirBlip.Remove();
-                                DataStore.PedList[iPedId].DirBlip = null;
-                            }
-                            DataStore.PedList[iPedId].ThisBlip = BlipActions.PedBlimp(DataStore.PedList[iPedId].ThisPed, 303, DataStore.PedList[iPedId].MyName, 1);
-                            DataStore.PedList[iPedId].Bounty = true;
                         }
                     }
-                    DataStore.bMenuOpen = false;
                     PzPool.CloseAllMenus();
                 }
             };

@@ -9,63 +9,17 @@ namespace PlayerZero
 {
     public class PedActions
     {
-        private static void NewPlayer()
-        {
-            LoggerLight.GetLogging("PedActions.NewPlayer, iCurrentPlayerz == " + DataStore.iCurrentPlayerz);
-            ReturnValues.SetBTimer(ReturnValues.RandInt(DataStore.MySettings.iMinWait, DataStore.MySettings.iMaxWait), 1);
-            IniSettings.LoadIniSetts();
-
-            int iHeister = NearHiest();
-
-            if (DataStore.iCurrentPlayerz + 5 < DataStore.MySettings.iMaxPlayers && iHeister != -1 && DataStore.bHeistPop)
-                HeistDrips(iHeister);
-            else if (DataStore.iCurrentPlayerz < DataStore.MySettings.iMaxPlayers)
+        public static List<Vector3> landPlane = new List<Vector3>();
+        private static readonly List<Vector3> HeistDrop = new List<Vector3>
             {
-                if (ReturnValues.FindRandom(0, 1, 10) < 6)
-                {
-                    if (ReturnValues.FindRandom(1, 1, 10) < 6)
-                        FindStuff.SearchPed(35.00f, 220.00f, null, 0, -1);
-                    else
-                    {
-                        int iTypeO = ReturnValues.FindRandom(2, 1, 9);
-                        FindStuff.SearchVeh(15.00f, 145.00f, VehActions.RandVeh(iTypeO), true, -1);
-                    }
-                }
-                else
-                    InABuilding();
-                DataStore.iCurrentPlayerz += 1;
-            }
-        }
-        private static void InABuilding()
-        {
-            LoggerLight.GetLogging("PedActions.InABuilding");
-
-            List<int> iKeepItReal = new List<int>();
-
-            for (int i = 0; i < DataStore.AFKList.Count(); i++)
-                iKeepItReal.Add(DataStore.AFKList[i].App);
-
-            int iMit = ReturnValues.RandInt(0, DataStore.AFKPlayers.Count - 1);
-
-            while (iKeepItReal.Contains(iMit))
-                iMit = ReturnValues.RandInt(0, DataStore.AFKPlayers.Count - 1);
-
-            string sName = ReturnValues.SillyNameList();
-            Blip FakeB = BlipActions.LocalBlip(DataStore.AFKPlayers[iMit], 417, sName);
-
-            AfkPlayer MyAfk = new AfkPlayer
-            {
-                ThisBlip = FakeB,
-                App = iMit,
-                Level = UniqueLevels(),
-                TimeOn = Game.GameTime + ReturnValues.RandInt(DataStore.MySettings.iMinSession, DataStore.MySettings.iMaxSession),
-                MyName = sName
+                new Vector3(-1105.577f, -1692.11f, 4.345489f),      //0
+                new Vector3(60.53763f, 8.939384f, 69.14648f),       //4
+                new Vector3(718.9022f, -980.336f, 24.12285f),       //8
+                new Vector3(1681.823f, 4817.896f, 42.01214f),       //12
+                new Vector3(-1038.972f, -2736.403f, 20.16928f)     //16
             };
-            DataStore.AFKList.Add(MyAfk);
 
-            ClearUp.BackItUpBrain();
-        }
-        private static void HeistDrips(int iMyArea)
+        public static void HeistDrips(int iMyArea)
         {
             LoggerLight.GetLogging("PedActions.HeistDrips, iMyArea == " + iMyArea);
 
@@ -108,29 +62,27 @@ namespace PlayerZero
             }
 
             for (int i = 0; i < VectorList.Count; i++)
-                PedActions.GenPlayerPed(VectorList[i], 90.00f, null, 0, -1, "");
-            DataStore.iCurrentPlayerz += 4;
+            {
+                PlayerBrain newBrain = new PlayerBrain();
+                newBrain.PFMySetting = FreemodePed.MakeFaces();
+                newBrain.MyName = ReturnValues.SillyNameList();
+                BuildObjects.GenPlayerPed(VectorList[i], RandomNum.RandInt(0, 360), newBrain);
+            }
+
             Script.Wait(1200);
             World.AddExplosion(VectorList[0], ExplosionType.Grenade, 7.00f, 15.00f, true, false);
             DataStore.bHeistPop = false;
         }
-        private static int NearHiest()
+        public static int NearHiest()
         {
             LoggerLight.GetLogging("PedActions.NearHiest");
 
             int iNear = -1;
-            List<Vector3> VectorList = new List<Vector3>
-            {
-                new Vector3(-1105.577f, -1692.11f, 4.345489f),      //0
-                new Vector3(60.53763f, 8.939384f, 69.14648f),       //4
-                new Vector3(718.9022f, -980.336f, 24.12285f),       //8
-                new Vector3(1681.823f, 4817.896f, 42.01214f),       //12
-                new Vector3(-1038.972f, -2736.403f, 20.16928f)     //16
-            };
 
-            for (int i = 0; i < VectorList.Count; i++)
+
+            for (int i = 0; i < HeistDrop.Count; i++)
             {
-                if (VectorList[i].DistanceTo(ReturnValues.YoPoza()) < 55.00f)
+                if (HeistDrop[i].DistanceTo(ReturnValues.YoPoza()) < 55.00f)
                 {
                     iNear = i;
                     break;
@@ -138,13 +90,13 @@ namespace PlayerZero
             }
             return iNear;
         }
-        public static void FireOrb(int MyBrian, Ped Target, bool bPlayerStrike)
+        public static void FireOrb(string sId, Ped Target, bool bPlayerStrike)
         {
-            LoggerLight.GetLogging("PedActions.FireOrb, MyBrian == " + MyBrian);
+            LoggerLight.GetLogging("PedActions.FireOrb, sId == " + sId);
 
             Ped pFired = Game.Player.Character;
 
-            MyBrian = ReteaveBrain(MyBrian);
+            int MyBrian = PlayerAI.ReteaveBrain(sId);
 
             if (MyBrian != -1)
             {
@@ -163,8 +115,8 @@ namespace PlayerZero
                         new Vector3(1286.877f, 2846.37f, 49.39426f)
                     };
 
-                    ClearUp.ClearPedBlips(DataStore.PedList[MyBrian].Level);
-                    DataStore.PedList[MyBrian].ThisBlip = BlipActions.LocalBlip(FacList[ReturnValues.RandInt(0, FacList.Count - 1)], 590, DataStore.PedList[MyBrian].MyName);
+                    ClearUp.ClearPedBlips(DataStore.PedList[MyBrian].MyIdentity);
+                    DataStore.PedList[MyBrian].ThisBlip = BuildObjects.LocalBlip(FacList[RandomNum.RandInt(0, FacList.Count - 1)], 590, DataStore.PedList[MyBrian].MyName);
 
                     pFired = DataStore.PedList[MyBrian].ThisPed;
                     Script.Wait(7500);
@@ -184,12 +136,12 @@ namespace PlayerZero
 
                     if (MyBrian != -1)
                     {
-                        ClearUp.PedCleaning(DataStore.PedList[MyBrian].Level, "left", false);
+                        ClearUp.PedCleaning(DataStore.PedList[MyBrian], "left", false);
                     }
                 }
             }
         }
-        private static void OrbExp(Ped PFired, Vector3 Pos1, Vector3 Pos2, Vector3 Pos3, Vector3 Pos4, Vector3 Pos5)
+        public static void OrbExp(Ped PFired, Vector3 Pos1, Vector3 Pos2, Vector3 Pos3, Vector3 Pos4, Vector3 Pos5)
         {
             LoggerLight.GetLogging("PedActions.OrbExp, Pos1 == " + Pos1);
 
@@ -202,14 +154,14 @@ namespace PlayerZero
             Function.Call(Hash.PLAY_SOUND_FROM_COORD, -1, "DLC_XM_Explosions_Orbital_Cannon", Pos1.X, Pos1.Y, Pos1.Z, 0, 0, 1, 0);
             Function.Call((Hash)0x6C38AF3693A69A91, "scr_xm_orbital");
         }
-        private static void OrbLoad(string sWhoDidit, bool bPlayerStrike)
+        public static void OrbLoad(string sWhoDidit, bool bPlayerStrike)
         {
             LoggerLight.GetLogging("PedActions.OrbLoad, sWhoDidit == " + sWhoDidit);
 
             if (bPlayerStrike)
-                UI.Notify("You obliterated "+ sWhoDidit + " with the Orbital Cannon.");
+                ScaleDisp.BottomLeft("You obliterated "+ sWhoDidit + " with the Orbital Cannon.");
             else
-                UI.Notify(sWhoDidit + " obliterated you with the Orbital Cannon.");
+                ScaleDisp.BottomLeft(sWhoDidit + " obliterated you with the Orbital Cannon.");
 
             DataStore.iScale = Function.Call<int>((Hash)0x11FE353CF9733E6F, "MIDSIZED_MESSAGE");
             Script.Wait(1500);
@@ -241,360 +193,13 @@ namespace PlayerZero
                 Function.Call(Hash.SET_SCALEFORM_MOVIE_AS_NO_LONGER_NEEDED, &SF);
             }
         }
-        public static Ped GenPlayerPed(Vector3 vLocal, float fAce, Vehicle vMyCar, int iSeat, int iReload, string sName)
-        {
-            LoggerLight.GetLogging("PedActions.GenPlayerPed, iSeat == " + iSeat + ", iReload == " + iReload);
-
-            Ped MyPed = null;
-            bool bMale = false;
-            int iOldPed = ReteaveBrain(iReload);
-            string sPeddy = "mp_f_freemode_01";
-
-            if (iOldPed == -1)
-            {
-                if (ReturnValues.FindRandom(13, 0, 20) < 10)
-                {
-                    bMale = true;
-                    sPeddy = "mp_m_freemode_01";
-                }
-            }
-            else
-            {
-                if (DataStore.PedList[iOldPed].PFMySetting.PFMale)
-                {
-                    bMale = true;
-                    sPeddy = "mp_m_freemode_01";
-                }
-            }
-
-            var model = new Model(sPeddy);
-            model.Request();    // Check if the model is valid
-            if (model.IsInCdImage && model.IsValid)
-            {
-                while (!model.IsLoaded)
-                    Script.Wait(1);
-
-                MyPed = Function.Call<Ped>(Hash.CREATE_PED, 4, model, vLocal.X, vLocal.Y, vLocal.Z, fAce, true, false);
-                Function.Call(Hash.SET_MODEL_AS_NO_LONGER_NEEDED, model.Hash);
-
-                if (MyPed.Exists())
-                {
-                    int iAccuracy = ReturnValues.RandInt(DataStore.MySettings.iAccMin, DataStore.MySettings.iAccMax);
-                    Function.Call(Hash.SET_PED_ACCURACY, MyPed.Handle, iAccuracy);
-                    MyPed.MaxHealth = ReturnValues.RandInt(200, 400);
-                    MyPed.Health = MyPed.MaxHealth;
-
-                    if (iOldPed == -1)
-                        OnlineFaceTypes(MyPed, bMale, vMyCar, iSeat, null, -1, sName);
-                    else
-                        OnlineFaceTypes(MyPed, bMale, vMyCar, iSeat, DataStore.PedList[iOldPed].PFMySetting, iReload, sName);
-                }
-                else
-                    MyPed = null;
-            }
-            else
-                MyPed = null;
-
-            return MyPed;
-        }
-        public static int ReteaveBrain(int iNumber)
-        {
-            LoggerLight.GetLogging("PedActions.ReteaveBrain, iNumber == " + iNumber);
-
-            int iAm = -1;
-            for (int i = 0; i < DataStore.PedList.Count; i++)
-            {
-                if (DataStore.PedList[i].Level == iNumber)
-                {
-                    iAm = i;
-                    break;
-                }
-            }
-            return iAm;
-        }
-        public static int ReteaveAfk(int iNumber)
-        {
-            LoggerLight.GetLogging("PedActions.ReteaveAfk, iNumber == " + iNumber);
-
-            int iAm = -1;
-            for (int i = 0; i < DataStore.AFKList.Count; i++)
-            {
-                if (DataStore.AFKList[i].Level == iNumber)
-                {
-                    iAm = i;
-                    break;
-                }
-            }
-            LoggerLight.GetLogging("PedActions.ReteaveAfk, iam == " + iAm);
-            return iAm;
-        }
-        private static void OnlineFaceTypes(Ped Pedx, bool bMale, Vehicle vMyCar, int iSeat, PedFixtures Fixtures, int iReload, string sName)
-        {
-            LoggerLight.GetLogging("PedActions.OnlineFaceTypes, iSeat == " + iSeat + ", iReload == " + iReload);
-
-            PedFixtures MyNewFixings = new PedFixtures();
-
-            int shapeFirstID = 0;
-            int shapeSecondID = 0;
-            int shapeThirdID = 0;
-            int skinFirstID = 1;
-            int skinSecondID = 1;
-            int skinThirdID = 1;
-            float shapeMix = 0.0f;
-            float skinMix = 0.0f;
-            float thirdMix = 0.0f;
-            bool isParent = false;
-
-            if (Fixtures == null)
-            {
-                if (bMale)
-                {
-                    MyNewFixings.PFMale = true;
-                    shapeFirstID = ReturnValues.RandInt(0, 20);
-                    shapeSecondID = ReturnValues.RandInt(0, 20);
-                    shapeThirdID = shapeFirstID;
-                    skinFirstID = shapeFirstID;
-                    skinSecondID = shapeSecondID;
-                    skinThirdID = shapeThirdID;
-                }
-                else
-                {
-                    MyNewFixings.PFMale = false;
-                    shapeFirstID = ReturnValues.RandInt(21, 41);
-                    shapeSecondID = ReturnValues.RandInt(21, 41);
-                    shapeThirdID = shapeFirstID;
-                    skinFirstID = shapeFirstID;
-                    skinSecondID = shapeSecondID;
-                    skinThirdID = shapeThirdID;
-                }
-                shapeMix = ReturnValues.RandFlow(-0.9f, 0.9f);
-                skinMix = ReturnValues.RandFlow(0.9f, 0.99f);
-                thirdMix = ReturnValues.RandFlow(-0.9f, 0.9f);
-
-                MyNewFixings.PFshapeFirstID = shapeFirstID;
-                MyNewFixings.PFshapeSecondID = shapeSecondID;
-                MyNewFixings.PFshapeThirdID = shapeThirdID;
-                MyNewFixings.PFskinFirstID = skinFirstID;
-                MyNewFixings.PFskinSecondID = skinSecondID;
-                MyNewFixings.PFskinThirdID = skinThirdID;
-                MyNewFixings.PFshapeMix = shapeMix;
-                MyNewFixings.PFskinMix = skinMix;
-                MyNewFixings.PFthirdMix = thirdMix;
-            }
-            else
-            {
-                bMale = Fixtures.PFMale;
-                shapeFirstID = Fixtures.PFshapeFirstID;
-                shapeSecondID = Fixtures.PFshapeSecondID;
-                shapeThirdID = Fixtures.PFshapeThirdID;
-                skinFirstID = Fixtures.PFskinFirstID;
-                skinSecondID = Fixtures.PFskinSecondID;
-                skinThirdID = Fixtures.PFskinThirdID;
-                shapeMix = Fixtures.PFshapeMix;
-                skinMix = Fixtures.PFskinMix;
-                thirdMix = Fixtures.PFthirdMix;
-            }
-
-            Function.Call(Hash.SET_PED_HEAD_BLEND_DATA, Pedx.Handle, shapeFirstID, shapeSecondID, shapeThirdID, skinFirstID, skinSecondID, skinThirdID, shapeMix, skinMix, thirdMix, isParent);
-
-            int iFeature = 0;
-
-            while (iFeature < 12)
-            {
-                int iColour = 0;
-                int iChange = ReturnValues.RandInt(0, Function.Call<int>(Hash._GET_NUM_HEAD_OVERLAY_VALUES, iFeature));
-                float fVar = ReturnValues.RandFlow(0.45f, 0.99f);
-
-                if (iFeature == 0)
-                {
-                    iChange = ReturnValues.RandInt(0, iChange);
-                }//Blemishes
-                else if (iFeature == 1)
-                {
-                    if (bMale)
-                        iChange = ReturnValues.RandInt(0, iChange);
-                    else
-                        iChange = 255;
-                    iColour = 1;
-                }//Facial Hair
-                else if (iFeature == 2)
-                {
-                    iChange = ReturnValues.RandInt(0, iChange);
-                    iColour = 1;
-                }//Eyebrows
-                else if (iFeature == 3)
-                {
-                    iChange = 255;
-                }//Ageing
-                else if (iFeature == 4)
-                {
-                    if (ReturnValues.RandInt(0, 50) < 40)
-                    {
-                        iChange = ReturnValues.RandInt(0, iChange);
-                    }
-                    else
-                        iChange = 255;
-                }//Makeup
-                else if (iFeature == 5)
-                {
-                    if (!bMale)
-                        iChange = ReturnValues.RandInt(0, iChange);
-                    else
-                        iChange = 255;
-                    iColour = 2;
-                }//Blush
-                else if (iFeature == 6)
-                {
-                    iChange = ReturnValues.RandInt(0, iChange);
-                }//Complexion
-                else if (iFeature == 7)
-                {
-                    iChange = 255;
-                }//Sun Damage
-                else if (iFeature == 8)
-                {
-                    if (!bMale)
-                        iChange = ReturnValues.RandInt(0, iChange);
-                    else
-                        iChange = 255;
-                    iColour = 2;
-                }//Lipstick
-                else if (iFeature == 9)
-                {
-                    iChange = ReturnValues.RandInt(0, iChange);
-                }//Moles/Freckles
-                else if (iFeature == 10)
-                {
-                    if (bMale)
-                        iChange = ReturnValues.RandInt(0, iChange);
-                    else
-                        iChange = 255;
-                    iColour = 1;
-                }//Chest Hair
-                else if (iFeature == 11)
-                {
-                    iChange = ReturnValues.RandInt(0, iChange);
-                }//Body Blemishes
-
-                int AddColour = ReturnValues.RandInt(0, 64);
-
-                if (Fixtures == null)
-                {
-                    MyNewFixings.PFFeature.Add(iChange);
-                    MyNewFixings.PFColour.Add(AddColour);
-                    MyNewFixings.PFAmount.Add(fVar);
-                }
-                else
-                {
-                    iChange = Fixtures.PFFeature[iFeature];
-                    AddColour = Fixtures.PFColour[iFeature];
-                    fVar = Fixtures.PFAmount[iFeature];
-                }
-
-                Function.Call(Hash.SET_PED_HEAD_OVERLAY, Pedx.Handle, iFeature, iChange, fVar);
-
-                if (iColour > 0)
-                    Function.Call(Hash._SET_PED_HEAD_OVERLAY_COLOR, Pedx.Handle, iFeature, iColour, AddColour, 0);
-
-                iFeature += 1;
-            }
-
-            if (Fixtures == null)
-            {
-                ClothBank MyNewWard = new ClothBank();
-                Function.Call(Hash.CLEAR_ALL_PED_PROPS, Pedx.Handle);
-
-                if (bMale)
-                    MyNewWard = DataStore.MaleCloth[ReturnValues.RandInt(0, DataStore.MaleCloth.Count - 1)];
-                else
-                    MyNewWard = DataStore.FemaleCloth[ReturnValues.RandInt(0, DataStore.FemaleCloth.Count - 1)];
-
-                MyNewFixings.PedClothB = MyNewWard;
-
-                OnlineSavedWard(Pedx, MyNewWard);
-            }
-            else
-                OnlineSavedWard(Pedx, Fixtures.PedClothB);
-
-
-            int iHairStyle = 0;
-            if (Fixtures == null)
-            {
-                if (bMale)
-                    iHairStyle = ReturnValues.RandInt(25, 76);
-                else
-                    iHairStyle = ReturnValues.RandInt(25, 80);
-
-                MyNewFixings.iHairCut = iHairStyle;
-            }
-            else
-                iHairStyle = Fixtures.iHairCut;
-
-            Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx.Handle, 2, iHairStyle, 0, 2);//hair
-
-            int iHair = ReturnValues.RandInt(0, Function.Call<int>(Hash._GET_NUM_HAIR_COLORS));
-            int iHair2 = ReturnValues.RandInt(0, Function.Call<int>(Hash._GET_NUM_HAIR_COLORS));
-
-            if (Fixtures == null)
-            {
-                MyNewFixings.PFHair01 = iHair;
-                MyNewFixings.PFHair02 = iHair2;
-            }
-            else
-            {
-                iHair = Fixtures.PFHair01;
-                iHair2 = Fixtures.PFHair02;
-            }
-
-            Function.Call(Hash._SET_PED_HAIR_COLOR, Pedx.Handle, iHair, iHair2);
-
-            if (Fixtures == null)
-            {
-                if (ReturnValues.RandInt(1, 10) < 5)
-                {
-                    List<Tattoo> Tatty = ReturnValues.AddRandTats(bMale);
-                    int iCount = ReturnValues.RandInt(1, Tatty.Count);
-
-                    for (int i = 0; i < iCount; i++)
-                    {
-                        int iTat = ReturnValues.RandInt(0, Tatty.Count - 1);
-                        Function.Call(Hash._SET_PED_DECORATION, Pedx.Handle, Function.Call<int>(Hash.GET_HASH_KEY, Tatty[iTat].BaseName), Function.Call<int>(Hash.GET_HASH_KEY, Tatty[iTat].TatName));
-                        MyNewFixings.TatBase.Add(Tatty[iTat].BaseName);
-                        MyNewFixings.TatName.Add(Tatty[iTat].TatName);
-                        Tatty.RemoveAt(iTat);
-                    }
-                }
-            }
-            else
-            {
-                for (int i = 0; i < Fixtures.TatBase.Count; i++)
-                    Function.Call(Hash._SET_PED_DECORATION, Pedx.Handle, Function.Call<int>(Hash.GET_HASH_KEY, Fixtures.TatBase[i]), Function.Call<int>(Hash.GET_HASH_KEY, Fixtures.TatName[i]));
-            }
-
-            if (Fixtures == null)
-                NpcBrains(Pedx, vMyCar, iSeat, MyNewFixings, -1, sName);
-            else
-                NpcBrains(Pedx, vMyCar, iSeat, null, iReload, sName);
-        }
-        private static void OnlineSavedWard(Ped Pedx, ClothBank MyCloths)
-        {
-            LoggerLight.GetLogging("PedActions.OnlineSavedWard");
-
-            Function.Call(Hash.CLEAR_ALL_PED_PROPS, Pedx.Handle);
-
-            for (int i = 0; i < MyCloths.ClothA.Count; i++)
-                Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Pedx.Handle, i, MyCloths.ClothA[i], MyCloths.ClothB[i], 2);
-
-            for (int i = 0; i < MyCloths.ExtraA.Count; i++)
-                Function.Call(Hash.SET_PED_PROP_INDEX, Pedx.Handle, i, MyCloths.ExtraA[i], MyCloths.ExtraB[i], false);
-        }
         public static void WarptoAnyVeh(Vehicle Vhic, Ped Peddy, int iSeat)
         {
             LoggerLight.GetLogging("PedActions.WarptoAnyVeh, iSeat == " + iSeat);
 
             Function.Call(Hash.SET_PED_INTO_VEHICLE, Peddy.Handle, Vhic.Handle, iSeat);
         }
-        private static void GetOutVehicle(Ped Peddy, int iPed)
+        public static void GetOutVehicle(Ped Peddy)
         {
             LoggerLight.GetLogging("PedActions.GetOutVehicle");
 
@@ -603,39 +208,28 @@ namespace PlayerZero
                 Vehicle PedVeh = Peddy.CurrentVehicle;
                 Function.Call(Hash.TASK_LEAVE_VEHICLE, Peddy.Handle, PedVeh.Handle, 4160);
             }
-            if (iPed != -1)
-            {
-                iPed = ReteaveBrain(iPed);
-                ClearUp.ClearPedBlips(DataStore.PedList[iPed].Level);
-                DataStore.PedList[iPed].DirBlip = BlipActions.DirectionalBlimp(DataStore.PedList[iPed].ThisPed);
-                DataStore.PedList[iPed].ThisBlip = BlipActions.PedBlimp(DataStore.PedList[iPed].ThisPed, 1, DataStore.PedList[iPed].MyName, DataStore.PedList[iPed].Colours);
-            }
         }
-        private static void PlayerEnterVeh(Vehicle Vhick)
+        public static void PlayerEnterVeh(Vehicle Vhick, bool bPass)
         {
             LoggerLight.GetLogging("PedActions.PlayerEnterVeh");
 
             DataStore.iFindingTime = Game.GameTime + 1000;
-            int iSeats = 0;
 
-            while (iSeats < Function.Call<int>(Hash.GET_VEHICLE_MAX_NUMBER_OF_PASSENGERS, Vhick.Handle))
+            int iSeats = ReturnValues.FindUSeat(Vhick, bPass);
+                
+            if (iSeats != -1)
             {
-                if (Function.Call<bool>(Hash.IS_VEHICLE_SEAT_FREE, Vhick.Handle, iSeats))
-                    break;
-                else
-                    iSeats += 1;
-            }
-            int ThreePass = 3;
-            while (!Function.Call<bool>(Hash.IS_PED_GETTING_INTO_A_VEHICLE, Game.Player.Character.Handle) && ThreePass > 0)
-            {
-                Script.Wait(500);
-                Function.Call(Hash.TASK_ENTER_VEHICLE, Game.Player.Character.Handle, Vhick.Handle, -1, iSeats, 1.50f, 1, 0);
-                ThreePass -= 1;
-            }
+                int ThreePass = 3;
+                while (!Function.Call<bool>(Hash.IS_PED_GETTING_INTO_A_VEHICLE, Game.Player.Character.Handle) && ThreePass > 0)
+                {
+                    Script.Wait(1000);
+                    Function.Call(Hash.TASK_ENTER_VEHICLE, Game.Player.Character.Handle, Vhick.Handle, -1, iSeats, 1.50f, 1, 0);
+                    ThreePass -= 1;
+                }
 
-            if (ThreePass < 1)
-                WarptoAnyVeh(Vhick, Game.Player.Character, iSeats);
-
+                if (ThreePass < 1)
+                    WarptoAnyVeh(Vhick, Game.Player.Character, iSeats);
+            }
         }
         public static void EmptyVeh(Vehicle Vhic)
         {
@@ -652,22 +246,61 @@ namespace PlayerZero
                 }
             }
         }
-        private static void FolllowTheLeader(Ped Peddy)
+        public static void PedDoGetIn(Vehicle GetV, Ped Peddy, string sId)
+        {
+            LoggerLight.GetLogging("PedActions.PedDoGetIn");
+
+            int iSeats = ReturnValues.FindUSeat(GetV, true);
+            int iThree = 3;
+
+            if (iSeats > -1)
+            {
+                if (Peddy.Position.DistanceTo(GetV.Position) < 65.00f)
+                {
+                    while (!Function.Call<bool>(Hash.IS_PED_GETTING_INTO_A_VEHICLE, Peddy.Handle) && iThree > 0)
+                    {
+                        iThree--;
+                        Function.Call(Hash.TASK_ENTER_VEHICLE, Peddy.Handle, GetV.Handle, -1, iSeats, 1.50f, 1, 0);
+                        Script.Wait(1000);
+                    }
+
+                    if (iThree < 1)
+                        WarptoAnyVeh(GetV, Peddy, iSeats);
+                }
+                else
+                    WarptoAnyVeh(GetV, Peddy, iSeats);
+            }
+            else
+            {
+                int iBPed = PlayerAI.ReteaveBrain(sId);
+                if (iBPed != -1)
+                {
+                    if (DataStore.PedList[iBPed].ThisVeh != null)
+                        DataStore.PedList[iBPed].ThisVeh.MarkAsNoLongerNeeded();
+
+                    DataStore.PedList[iBPed].Passenger = false;
+                    DataStore.PedList[iBPed].Driver = true;
+                    if (DataStore.PedList[iBPed].PrefredVehicle == 0)
+                        DataStore.PedList[iBPed].PrefredVehicle = 1;
+                    FindVeh MyFinda = new FindVeh(1.00f, 95.00f, false, false, DataStore.PedList[iBPed]);
+                    FindStuff.MakeCarz.Add(MyFinda);
+                }
+            }
+        }
+        public static void FolllowTheLeader(Ped Peddy)
         {
             LoggerLight.GetLogging("PedActions.FolllowTheLeader");
 
             Function.Call(Hash.SET_PED_AS_GROUP_MEMBER, Peddy.Handle, DataStore.iFollowMe);
             Peddy.RelationshipGroup = DataStore.Gp_Follow;
             Function.Call(Hash.SET_PED_FLEE_ATTRIBUTES, Peddy.Handle, 0, true);
-            Peddy.BlockPermanentEvents = false;
-            Peddy.AlwaysKeepTask = true;
 
-            if (DataStore.MySettings.iAggression > 5)
+            if (DataStore.MySettings.Aggression > 5)
                 Function.Call(Hash.SET_PED_CAN_BE_TARGETTED_BY_PLAYER, Peddy.Handle, Game.Player.Character.Handle, true);
             else
                 Function.Call(Hash.SET_PED_CAN_BE_TARGETTED_BY_PLAYER, Peddy.Handle, Game.Player.Character.Handle, false);
         }
-        private static void OhDoKeepUp(Ped Peddy)
+        public static void OhDoKeepUp(Ped Peddy)
         {
             Peddy.Task.ClearAll();
 
@@ -713,8 +346,10 @@ namespace PlayerZero
             }
 
             Function.Call(Hash.TASK_FOLLOW_TO_OFFSET_OF_ENTITY, Peddy.Handle, Game.Player.Character.Handle, fXpos, fYpos, 0.0f, 1.0f, -1, 2.5f, true);
+
+            Peddy.BlockPermanentEvents = false;
         }
-        private static void DriveBye(Ped Peddy)
+        public static void DriveBye(Ped Peddy, Ped Target)
         {
             LoggerLight.GetLogging("PedActions.DriveBye");
 
@@ -722,35 +357,28 @@ namespace PlayerZero
             {
                 if (Peddy.SeatIndex == VehicleSeat.Driver)
                 {
-                    if (Game.Player.Character.IsInVehicle())
-                        Peddy.Task.VehicleChase(Game.Player.Character);
+                    if (Target.IsInVehicle())
+                        Peddy.Task.VehicleChase(Target);
                     else
-                        Peddy.Task.DriveTo(Peddy.CurrentVehicle, ReturnValues.YoPoza(), 10.00f, 45.00f, 0);
-
-                    Function.Call(Hash.SET_DRIVER_ABILITY, Peddy.Handle, 1.00f);
-                    Function.Call(Hash.SET_PED_STEERS_AROUND_VEHICLES, Peddy.Handle, true);
+                        Peddy.Task.DriveTo(Peddy.CurrentVehicle, Target.Position, 10.00f, 45.00f, 0);
                 }
                 else
-                    Peddy.Task.VehicleShootAtPed(Game.Player.Character);
+                    Peddy.Task.VehicleShootAtPed(Target);
             }
         }
-        private static void DriveAround(Ped Peddy)
+        public static void DriveAround(Ped Peddy)
         {
             LoggerLight.GetLogging("PedActions.DriveAround");
 
             if (Peddy.IsInVehicle())
             {
                 if (Peddy.SeatIndex == VehicleSeat.Driver)
-                {
-                    float fAggi = DataStore.MySettings.iAggression / 100;
                     Peddy.Task.CruiseWithVehicle(Peddy.CurrentVehicle, 85.00f, 262972);
-                    Function.Call(Hash.SET_DRIVER_ABILITY, Peddy.Handle, 1.00f);
-                    Function.Call(Hash.SET_DRIVER_AGGRESSIVENESS, Peddy.Handle, fAggi);
-                    Function.Call(Hash.SET_PED_STEERS_AROUND_VEHICLES, Peddy.Handle, true);
-                }
+                Peddy.AlwaysKeepTask = true;
+                Peddy.BlockPermanentEvents = true;
             }
         }
-        public static void DriveTooo(Ped Peddy, bool bRunOver)
+        public static void DriveToooPlayer(Ped Peddy, bool bRunOver)
         {
             LoggerLight.GetLogging("PedActions.DriveTooo, bRunOver == " + bRunOver);
 
@@ -764,12 +392,81 @@ namespace PlayerZero
                     else
                         Peddy.Task.DriveTo(Peddy.CurrentVehicle, ReturnValues.YoPoza(), 10.00f, 25.00f, 0);
 
-                    Function.Call(Hash.SET_DRIVER_ABILITY, Peddy.Handle, 1.00f);
-                    Function.Call(Hash.SET_PED_STEERS_AROUND_VEHICLES, Peddy.Handle, true);
+                    Peddy.AlwaysKeepTask = true;
+                    Peddy.BlockPermanentEvents = true;
                 }
             }
         }
-        private static void DriveToooDest(Ped Peddy, Vector3 Vme)
+        public static void LandNearHeli(Ped Peddy, Vehicle vHick, Vector3 vTarget)
+        {
+            float HeliDesX = vTarget.X;
+            float HeliDesY = vTarget.Y;
+            float HeliDesZ = vTarget.Z;
+            float HeliSpeed = 35f;
+            float HeliLandArea = 10f;
+
+            float dx = vHick.Position.X - HeliDesX;
+            float dy = vHick.Position.Y - HeliDesY;
+            float HeliDirect = Function.Call<float>(Hash.GET_HEADING_FROM_VECTOR_2D, dx, dy) - 180.00f;
+
+            Function.Call(Hash.TASK_HELI_MISSION, Peddy.Handle, vHick.Handle, 0, 0, HeliDesX, HeliDesY, HeliDesZ, 20, HeliSpeed, HeliLandArea, HeliDirect, -1, -1, -1, 0);
+
+            Function.Call(Hash.SET_PED_FIRING_PATTERN, Peddy.Handle, Function.Call<int>(Hash.GET_HASH_KEY, "FIRING_PATTERN_BURST_FIRE_HELI"));
+            Peddy.AlwaysKeepTask = true;
+            Peddy.BlockPermanentEvents = true;
+        }
+        public static void LandNearPlane(Ped Peddy, Vehicle vHick, Vector3 vStart, Vector3 vFinish)
+        {
+            Function.Call(Hash.TASK_PLANE_LAND, Peddy.Handle, vHick.Handle, vStart.X, vStart.Y, vStart.Z, vFinish.X, vFinish.Y, vFinish.Z);
+            Function.Call(Hash.SET_PED_FLEE_ATTRIBUTES, Peddy.Handle, 0, true);
+        }
+        public static List<Vector3> BuildFlightPath(Vector3 vStart)
+        {
+            landPlane.Clear();
+
+            List<Vector3> landSand = new List<Vector3>
+            {
+                 new Vector3(225.8934f, 2841.527f, 200.0402f),
+                 new Vector3(796.0992f, 3011.926f, 90.13193f),
+                 new Vector3(1495.307f, 3187.998f, 41.04951f),
+                 new Vector3(1655.049f, 3249.205f, 41.21964f),
+                 new Vector3(1561.392f, 3160.818f, 41.1649f),
+                 new Vector3(1334.507f, 2924.953f, 98.35621f),
+                 new Vector3(798.5253f, 2388.362f, 282.331f),
+                 new Vector3(413.3483f, 2034.074f, 425.4946f),
+                 new Vector3(-175.5016f, 1448.899f, 598.845f),
+                 new Vector3(-349.6658f, -187.2563f, 398.4032f)
+            };
+            List<Vector3> landLS = new List<Vector3>
+            {
+                 new Vector3(-1002.727f, -1650.774f, 134.2087f),
+                 new Vector3(-1193.304f, -1941.04f, 59.51603f),
+                 new Vector3(-1571.467f, -2617.15f, 14.57554f),
+                 new Vector3(-1612.011f, -2789.524f, 14.62421f),
+                 new Vector3(-1532.074f, -2835.987f, 14.58676f),
+                 new Vector3(-991.79f, -3147.605f, 90.8317f),
+                 new Vector3(-440.5424f, -3123.56f, 232.0305f),
+                 new Vector3(-88.80471f, -2403.97f, 234.262f),
+                 new Vector3(-18.7144f, -1591.593f, 351.0859f),
+                 new Vector3(29.53166f, 219.7558f, 581.6113f),
+                 new Vector3(-169.9742f, 1746.14f, 484.2034f)
+            };
+
+            float f1 = landSand[0].DistanceTo(vStart);
+            float f2 = landLS[0].DistanceTo(vStart);
+
+            if (f1 < f2)
+            {
+                DataStore.FlyMeToo = landLS[0];
+                return landSand;
+            }
+            else
+            {
+                DataStore.FlyMeToo = landSand[0];
+                return landLS;
+            }
+        }
+        public static void DriveToooDest(Ped Peddy, Vector3 Vme, float fSpeed)
         {
             LoggerLight.GetLogging("PedActions.DriveToooDest, Vme == " + Vme);
 
@@ -777,9 +474,19 @@ namespace PlayerZero
             {
                 if (Peddy.SeatIndex == VehicleSeat.Driver)
                 {
-                    Peddy.Task.DriveTo(Peddy.CurrentVehicle, Vme, 1.00f, 45.00f, 262972);
-                    Function.Call(Hash.SET_DRIVER_ABILITY, Peddy.Handle, 1.00f);
-                    Function.Call(Hash.SET_PED_STEERS_AROUND_VEHICLES, Peddy.Handle, true);
+                    Peddy.Task.DriveTo(Peddy.CurrentVehicle, Vme, 1.00f, fSpeed, 262972);
+                }
+            }
+        }
+        public static void DriveDirect(Ped Peddy, Vector3 Vme, float fSpeed)
+        {
+            LoggerLight.GetLogging("PedActions.DriveDirect, Vme == " + Vme);
+
+            if (Peddy.IsInVehicle())
+            {
+                if (Peddy.SeatIndex == VehicleSeat.Driver)
+                {
+                    Peddy.Task.DriveTo(Peddy.CurrentVehicle, Vme, 1.00f, fSpeed, 16777216);
                 }
             }
         }
@@ -797,81 +504,27 @@ namespace PlayerZero
             if (!bInVeh)
                 Peddy.Task.FightAgainst(Game.Player.Character);
             else
-                DriveBye(Peddy);
+                DriveBye(Peddy, Game.Player.Character);
         }
-        private static void AirAttack(int iPed)
+        public static void GreefWar(Ped Peddy, Ped Victim)
         {
-            LoggerLight.GetLogging("PedActions.AirAttack, iPed == " + iPed);
+            LoggerLight.GetLogging("PedActions.GreefWar");
+            if (Victim != null)
+            {
+                Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, Peddy.Handle);
+                Victim.IsEnemy = true;
+                Victim.CanBeTargette﻿d﻿ = true;
+                Function.Call(Hash.SET_PED_FLEE_ATTRIBUTES, Peddy.Handle, 0, true);
+                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 46, true);
 
-            int iFinder = ReturnValues.FindRandom(21, 1, 100);
-
-            if (iFinder < 33)
-                HeliFighter(iPed);
-            else if (iFinder < 66)
-                LaserFighter(iPed);
-            else
-                OppresorFighter(iPed);
+                Peddy.Task.FightAgainst(Victim);
+            }
         }
-        private static void HeliFighter(int iPed)
+        public static void FlyHeli(Ped Pedd, Vehicle Vhick, Vector3 vHeliDest, float fSpeed, float flanding)
         {
-            LoggerLight.GetLogging("PedActions.HeliFighter, iPed == " + iPed);
+            LoggerLight.GetLogging("PedActions.FlyHeli");
 
-            int MyPed = ReteaveBrain(iPed);
-            Ped Peddy = DataStore.PedList[MyPed].ThisPed;
-            DataStore.PedList[MyPed].AirAttack = 1;
-            string sVeh = VehActions.RandVeh(13);
-            Vehicle vHeli = VehActions.VehicleSpawn(sVeh, new Vector3(Peddy.Position.X, Peddy.Position.Y, Peddy.Position.Z + 250.00f), 0.00f, false, iPed, true, false);
-            FlyAway(DataStore.PedList[MyPed].ThisPed, ReturnValues.YoPoza(), 250.00f, 0.00f);
-            Function.Call(Hash.SET_PED_FIRING_PATTERN, Peddy.Handle, Function.Call<int>(Hash.GET_HASH_KEY, "FIRING_PATTERN_BURST_FIRE_HELI"));
-            Peddy.RelationshipGroup = DataStore.GP_Mental;
-            Peddy.BlockPermanentEvents = false;
-        }
-        private static void LaserFighter(int iPed)
-        {
-            LoggerLight.GetLogging("PedActions.LaserFighter, iPed == " + iPed);
-
-            int MyPed = ReteaveBrain(iPed);
-            Ped Peddy = DataStore.PedList[MyPed].ThisPed;
-            DataStore.PedList[MyPed].AirAttack = 2;
-            DataStore.PedList[MyPed].AirDirect = (float)ReturnValues.RandInt(0, 360);
-            string sVeh = VehActions.RandVeh(12);
-            Vehicle vPlane = VehActions.VehicleSpawn(sVeh, new Vector3(Peddy.Position.X, Peddy.Position.Y, Peddy.Position.Z + 1550.00f), 0.00f, false, iPed, true, false);
-            Function.Call(Hash.TASK_PLANE_MISSION, DataStore.PedList[MyPed].ThisPed.Handle, DataStore.PedList[MyPed].ThisVeh.Handle, 0, Game.Player.Character.Handle, 0, 0, 0, 6, 0.0f, 0.0f, DataStore.PedList[MyPed].AirDirect, 1000.0f, -5000.0f);
-            Function.Call(Hash.SET_PED_FLEE_ATTRIBUTES, Peddy.Handle, 0, true);
-            Peddy.RelationshipGroup = DataStore.GP_Mental;
-            Peddy.BlockPermanentEvents = false;
-        }
-        private static void OppresorFighter(int iPed)
-        {
-            LoggerLight.GetLogging("PedActions.OppresorFighter, iPed == " + iPed);
-
-            int MyPed = ReteaveBrain(iPed);
-            Ped Peddy = DataStore.PedList[MyPed].ThisPed;
-            DataStore.PedList[MyPed].AirAttack = 3;
-            DataStore.PedList[MyPed].AirDirect = (float)ReturnValues.RandInt(0, 360);
-            Vehicle Planes = VehActions.VehicleSpawn("hydra", new Vector3(Peddy.Position.X, Peddy.Position.Y, Peddy.Position.Z + 1550.00f), 0.00f, false, iPed, true, false);
-            ClearUp.ClearPedBlips(iPed);
-            DataStore.PedList[MyPed].ThisBlip = BlipActions.PedBlimp(Peddy, 639, DataStore.PedList[MyPed].MyName, DataStore.PedList[MyPed].Colours);
-            Function.Call(Hash.TASK_PLANE_MISSION, Peddy.Handle, Planes.Handle, 0, Game.Player.Character.Handle, 0, 0, 0, 6, 0.0f, 0.0f, DataStore.PedList[MyPed].AirDirect, 300.0f, -5000.0f);
-            Function.Call(Hash.SET_PED_FLEE_ATTRIBUTES, Peddy.Handle, 0, true);
-            Peddy.RelationshipGroup = DataStore.GP_Mental;
-            Peddy.BlockPermanentEvents = false;
-
-            Vehicle Bike = VehActions.VehicleSpawn("oppressor2", new Vector3(Peddy.Position.X, Peddy.Position.Y, Peddy.Position.Z + 1550.00f), 0.00f, false, iPed, true, true);
-            Bike.IsPersistent = true;
-            DataStore.PedList[MyPed].ThisOppress = Bike;
-            Function.Call(Hash.ATTACH_ENTITY_TO_ENTITY, Bike.Handle, Planes.Handle, Function.Call<int>(Hash.GET_PED_BONE_INDEX, Planes.Handle, 0), 0.00f, 3.32999945f, -0.10f, 0.00f, 0.00f, 0.00f, false, false, false, false, 2, true);
-
-            Planes.IsVisible = false;
-            Bike.IsVisible = true;
-            Peddy.IsVisible = true;
-        }
-        private static void FlyAway(Ped Pedd, Vector3 vHeliDest, float fSpeed, float flanding)
-        {
-            LoggerLight.GetLogging("PedActions.FlyAway");
-
-            Vehicle vHeli = Pedd.CurrentVehicle;
-            vHeli.FreezePosition = false;
+            Vhick.FreezePosition = false;
 
             float HeliDesX = vHeliDest.X;
             float HeliDesY = vHeliDest.Y;
@@ -882,51 +535,88 @@ namespace PlayerZero
             float dx = Pedd.Position.X - HeliDesX;
             float dy = Pedd.Position.Y - HeliDesY;
             float HeliDirect = Function.Call<float>(Hash.GET_HEADING_FROM_VECTOR_2D, dx, dy) - 180.00f;
-            Function.Call(Hash.TASK_HELI_MISSION, Pedd.Handle, vHeli.Handle, 0, 0, HeliDesX, HeliDesY, HeliDesZ, 9, HeliSpeed, HeliLandArea, HeliDirect, -1, -1, -1, 0);
+
+            Function.Call(Hash.TASK_HELI_MISSION, Pedd.Handle, Vhick.Handle, 0, 0, HeliDesX, HeliDesY, HeliDesZ, 9, HeliSpeed, HeliLandArea, HeliDirect, -1, -1, -1, 0);
+            Function.Call(Hash.SET_PED_FIRING_PATTERN, Pedd.Handle, Function.Call<int>(Hash.GET_HASH_KEY, "FIRING_PATTERN_BURST_FIRE_HELI"));
             Pedd.AlwaysKeepTask = true;
             Pedd.BlockPermanentEvents = true;
         }
-        public static void MoneyDrops()
+        public static void FlyPlane(Ped Pedd, Vehicle Vhick, Vector3 vPlaneDest, Ped AttackPLayer)
         {
+            LoggerLight.GetLogging("PedActions.FlyPlane");
 
-        }
-        public static void AddEclipsWindMill()
-        {
-            LoggerLight.GetLogging("PedActions.AddEclipsWindMill");
-            if (!DataStore.bEclipceWind)
+            float fAngle = Vector3.Angle(Vhick.Position, vPlaneDest);
+            if (AttackPLayer != null)
             {
-                Prop Plop = World.CreateProp("prop_windmill_01", new Vector3(-832.50f, 290.95f, 82.00f), new Vector3(-90.00f, 94.72f, 0.00f), true, false);
-                DataStore.Plops.Add(new Prop(Plop.Handle));
-                DataStore.bEclipceWind = true;
+                Function.Call(Hash.TASK_PLANE_MISSION, Pedd.Handle, Vhick.Handle, 0, AttackPLayer, 0, 0, 0, 6, 0.0f, 0.0f, fAngle, 1000.0f, -5000.0f);
+                Function.Call(Hash.SET_PED_FLEE_ATTRIBUTES, Pedd.Handle, 0, true);
+                Pedd.RelationshipGroup = DataStore.GP_Mental;
+                Pedd.BlockPermanentEvents = false;
             }
+            else
+                Function.Call(Hash.TASK_PLANE_MISSION, Pedd.Handle, Vhick.Handle, 0, 0, vPlaneDest.X, vPlaneDest.Y, vPlaneDest.Z, 6, 20f, 50f, -1f, fAngle, 50, 1);
         }
-        public static void DropObjects(Vector3 vTarget)
+        public static void MoneyDrops(string sId)
         {
-            LoggerLight.GetLogging("PedActions.DropObjects");
+            int MyPed = PlayerAI.ReteaveBrain(sId);
 
-            string sObject;
-            Entity Plop;
-            if (ReturnValues.FindRandom(22,1, 10) < 5)
+            if (DataStore.Plops.Count < 6 && DataStore.iMoneyDropRate < Game.GameTime)
             {
-                sObject = DataStore.DropProplist[ReturnValues.FindRandom(23, 0, DataStore.DropProplist.Count - 1)];
-                Plop = World.CreateProp(sObject, vTarget, Vector3.Zero, true, false);
+                DataStore.iMoneyDropRate = Game.GameTime + RandomNum.RandInt(200, 800);
+                Vector3 vTarget = DataStore.PedList[MyPed].ThisPed.Position.Around(4f);
+
+                BuildObjects.BuildProps("prop_money_bag_01", vTarget, Vector3.Zero, true, true);
+
+                DataStore.PedList[MyPed].ThisPed.Task.RunTo(vTarget, true);
             }
             else
             {
-                sObject = DataStore.DropVehlist[ReturnValues.FindRandom(24, 0, DataStore.DropVehlist.Count - 1)];
-                Plop = VehActions.VehicleSpawn(sObject, vTarget, ReturnValues.RandInt(1, 360), false, -1, false, true);
+                for (int i = 0; i < DataStore.Plops.Count; i++)
+                {
+                    if (DataStore.PedList[MyPed].ThisPed.Position.DistanceTo(DataStore.Plops[i].Position) < 1.00f)
+                    {
+                        if (i > 0)
+                            DataStore.PedList[MyPed].ThisPed.Task.RunTo(DataStore.Plops[i - 1].Position, true);
+
+                        DataStore.Plops[i].Delete();
+                        DataStore.Plops.RemoveAt(i);
+
+                        break;
+                    }
+                }
             }
-            Plop.ApplyForce(new Vector3(0.00f, 0.00f, 1.00f), new Vector3(0.00f, 0.00f, 1.00f));
-            Script.Wait(2000);
-            Plop.MarkAsNoLongerNeeded();
         }
-        private static void HackerTime(Ped Peddy)
+        public static void RemoveMoneyDrop(string sId)
+        {
+            DataStore.iMoneyDrops = -1;
+            DataStore.iMoneyDropRate = 0;
+            DataStore.sMoneyPicker = "";
+            int MyPed = PlayerAI.ReteaveBrain(sId);
+            for (int i = 0; i < DataStore.PedList.Count; i++)
+            {
+                if (DataStore.PedList[i].Follower && DataStore.PedList[i].ThisPed != null)
+                    DataStore.PedList[i].ThisPed.Task.FightAgainst(DataStore.PedList[MyPed].ThisPed, -1);
+            }
+            ClearUp.ClearProps();
+        }
+        public static void EclipsWindMill()
+        {
+            LoggerLight.GetLogging("PedActions.AddEclipsWindMill");
+            if (DataStore.WindMill == null)
+                DataStore.WindMill = BuildObjects.BuildProps("prop_windmill_01", new Vector3(-832.50f, 290.95f, 82.00f), new Vector3(-90.00f, 94.72f, 0.00f), false, false);
+            else
+            {
+                DataStore.WindMill.Delete();
+                DataStore.WindMill = null;
+            }
+        }
+        public static void HackerTime(Ped Peddy)
         {
             LoggerLight.GetLogging("PedActions.HackerTime");
 
-            if (ReturnValues.YoPoza().DistanceTo(new Vector3(-778.81F, 312.66F, 84.70F)) < 80.00f)
+            if (ReturnValues.YoPoza().DistanceTo(new Vector3(-778.81F, 312.66F, 84.70F)) < 80.00f && DataStore.WindMill == null)
             {
-                AddEclipsWindMill();
+                EclipsWindMill();
             }// Add windmill  
             else if (Peddy.IsInVehicle())
             {
@@ -953,7 +643,7 @@ namespace PlayerZero
 
             //Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, Peddy.Handle);
         }
-        private static void RoBoCar(Vehicle Atchoo)
+        public static void RoBoCar(Vehicle Atchoo)
         {
             LoggerLight.GetLogging("PedActions.RoBoCar");
 
@@ -1180,344 +870,7 @@ namespace PlayerZero
             Function.Call(Hash.TASK_PLAY_ANIM_ADVANCED, peddy.Handle, sAnimDict, sAnimName, AnPos.X, AnPos.Y, AnPos.Z, AnRot.X, AnRot.Y, AnRot.Z, 8.0f, 0.00f, -1, 1, 0.01f, 0, 0);
             Function.Call(Hash.REMOVE_ANIM_DICT, sAnimDict);
         }
-        private static void NpcBrains(Ped Peddy, Vehicle VeHic, int iSeat, PedFixtures Fixtures, int iReload, string sName)
-        {
-            LoggerLight.GetLogging("PedActions.NpcBrains, iSeat == " + iSeat + ", iReload == " + iReload);
-
-            if (iReload != -1)
-            {
-                int iPosNum = ReteaveBrain(iReload);
-                if (iPosNum == -1)
-                {
-                    Peddy.Delete();
-                }
-                else
-                {
-                    DataStore.PedList[iPosNum].ThisPed = Peddy;
-                    DataStore.PedList[iPosNum].DirBlip = BlipActions.DirectionalBlimp(Peddy);
-                    DataStore.PedList[iPosNum].ThisBlip = BlipActions.PedBlimp(Peddy, 1, DataStore.PedList[iPosNum].MyName, DataStore.PedList[iPosNum].Colours);
-                    DataStore.PedList[iPosNum].DeathSequence = 0;
-                    DataStore.PedList[iPosNum].EnterVehQue = false;
-                    DataStore.PedList[iPosNum].Befallen = false;
-
-                    Function.Call(Hash.SET_PED_CAN_SWITCH_WEAPON, Peddy.Handle, true);
-                    Function.Call(Hash.SET_PED_COMBAT_MOVEMENT, Peddy.Handle, 2);
-                    Function.Call(Hash.SET_PED_PATH_CAN_USE_CLIMBOVERS, Peddy.Handle, true);
-                    Function.Call(Hash.SET_PED_PATH_CAN_USE_LADDERS, Peddy.Handle, true);
-                    Function.Call(Hash.SET_PED_PATH_CAN_DROP_FROM_HEIGHT, Peddy.Handle, true);
-                    Function.Call(Hash.SET_PED_PATH_PREFER_TO_AVOID_WATER, Peddy.Handle, false);
-                    Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 0, true);
-                    Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 1, true);
-                    if (DataStore.MySettings.iAggression > 2)
-                        Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 2, true);
-                    Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 3, true);
-                    Peddy.CanBeTargetted = true;
-
-                    if (!DataStore.PedList[iPosNum].Friendly)
-                    {
-                        Function.Call(Hash.REMOVE_PED_FROM_GROUP, Peddy.Handle);
-                        Peddy.RelationshipGroup = DataStore.GP_Attack;
-                        if (DataStore.PedList[iPosNum].OffRadar == 0 && ReturnValues.RandInt(0, 40) < 10)
-                            DataStore.PedList[iPosNum].OffRadar = -1;
-                        FightPlayer(Peddy, false);
-                    }
-                    else
-                    {
-                        if (DataStore.PedList[iPosNum].Follower)
-                        {
-                            FolllowTheLeader(Peddy);
-                            OhDoKeepUp(Peddy);
-                        }
-                        else
-                        {
-                            Peddy.Task.WanderAround();
-                            Function.Call(Hash.REMOVE_PED_FROM_GROUP, Peddy.Handle);
-                            Peddy.RelationshipGroup = DataStore.Gp_Friend;
-                        }
-                    }
-                    GunningIt(Peddy);
-                }
-            }
-            else
-            {
-                bool bXAfk = true;
-
-                if (sName == "")
-                {
-                    sName = ReturnValues.SillyNameList();
-                    bXAfk = false;
-                }
-
-                PlayerBrain MyBrains = new PlayerBrain
-                {
-                    ThisPed = Peddy,
-                    PFMySetting = Fixtures,
-                    DeathSequence = 0,
-                    DeathTime = 0,
-                    TimeOn = Game.GameTime + ReturnValues.RandInt(DataStore.MySettings.iMinSession, DataStore.MySettings.iMaxSession),
-                    MyName = sName,
-                    Level = UniqueLevels(),
-                    Killed = 0,
-                    Kills = 0,
-                    FindPlayer = 0,
-                    Colours = 0,
-                    OffRadar = 0,
-                    AirAttack = 0,
-                    AirDirect = 0.00f,
-                    OffRadarBool = false,
-                    Friendly = true,
-                    Hacker = false,
-                    InCombat = false,
-                    Bounty = false,
-                    Horny = false,
-                    Horny2 = false,
-                    Follower = false,
-                    SessionJumper = false,
-                    ApprochPlayer = false,
-                    EnterVehQue = false,
-                    Driver = false,
-                    Pilot = false,
-                    Befallen = false,
-                    Passenger = false,
-                    DirBlip = null,
-                    ThisOppress = null
-                };
-
-                if (iSeat == -1)
-                    MyBrains.ThisVeh = VeHic;
-                else
-                    MyBrains.ThisVeh = null;
-
-                Function.Call(Hash.SET_PED_CAN_SWITCH_WEAPON, Peddy.Handle, true);
-                Function.Call(Hash.SET_PED_COMBAT_MOVEMENT, Peddy.Handle, 2);
-                Function.Call(Hash.SET_PED_PATH_CAN_USE_CLIMBOVERS, Peddy.Handle, true);
-                Function.Call(Hash.SET_PED_PATH_CAN_USE_LADDERS, Peddy.Handle, true);
-                Function.Call(Hash.SET_PED_PATH_CAN_DROP_FROM_HEIGHT, Peddy.Handle, true);
-                Function.Call(Hash.SET_PED_PATH_PREFER_TO_AVOID_WATER, Peddy.Handle, false);
-                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 0, true);
-                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 1, true);
-                if (DataStore.MySettings.iAggression > 3)
-                    Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 2, true);
-                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, Peddy.Handle, 3, true);
-                Peddy.CanBeTargetted = true;
-
-                int iBrain = 1;
-
-                if (bXAfk)
-                {
-                    iBrain = 3;
-                }
-                else
-                {
-                    if (DataStore.MySettings.iAggression < 4 && VeHic == null)
-                    {
-                        if (ReturnValues.FindRandom(16, 0, 40) < 10)
-                            iBrain = 2;
-                    }
-                    else if (DataStore.MySettings.iAggression < 6)
-                    {
-                        if (ReturnValues.FindRandom(17, 0, 60) < 5)
-                            iBrain = 3;
-                        else if (VeHic == null)
-                        {
-                            if (ReturnValues.FindRandom(18, 0, 40) < 10)
-                                iBrain = 2;
-                        }
-                    }
-                    else if (DataStore.MySettings.iAggression < 8)
-                    {
-                        if (ReturnValues.FindRandom(19, 0, 60) < 40)
-                            iBrain = 3;
-                        else if (VeHic == null)
-                        {
-                            if (ReturnValues.FindRandom(20, 0, 40) < 10)
-                                iBrain = 2;
-                        }
-                    }
-                    else if (DataStore.MySettings.iAggression < 11)
-                    {
-                        iBrain = 3;
-                    }
-                    else
-                    {
-                        if (!DataStore.bHackerIn)
-                            iBrain = 4;
-                        else
-                            iBrain = 3;
-
-                    }
-                }
-
-                if (iBrain == 1)
-                {
-                    Peddy.Task.WanderAround();
-                    MyBrains.DirBlip = BlipActions.DirectionalBlimp(Peddy);
-                    MyBrains.ThisBlip = BlipActions.PedBlimp(Peddy, 1, MyBrains.MyName, 0);
-                    Function.Call(Hash.REMOVE_PED_FROM_GROUP, Peddy.Handle);
-                    Peddy.RelationshipGroup = DataStore.Gp_Friend;
-                }            //Friend
-                else if (iBrain == 2)
-                {
-                    Peddy.Task.WanderAround();
-                    MyBrains.DirBlip = BlipActions.DirectionalBlimp(Peddy);
-                    MyBrains.ThisBlip = BlipActions.PedBlimp(Peddy, 1, MyBrains.MyName, 0);
-                    MyBrains.SessionJumper = true;
-                }       //Disconect
-                else if (iBrain == 3)
-                {
-                    FightPlayer(Peddy, false);
-                    MyBrains.DirBlip = BlipActions.DirectionalBlimp(Peddy);
-                    MyBrains.ThisBlip = BlipActions.PedBlimp(Peddy, 1, MyBrains.MyName, 1);
-                    MyBrains.Colours = 1;
-                    MyBrains.Friendly = false;
-                    Function.Call(Hash.REMOVE_PED_FROM_GROUP, Peddy.Handle);
-                    Peddy.RelationshipGroup = DataStore.GP_Mental;
-                }       //Enemy
-                else
-                {
-                    DataStore.bHackerIn = true;
-                    MyBrains.DirBlip = BlipActions.DirectionalBlimp(Peddy);
-                    MyBrains.ThisBlip = BlipActions.PedBlimp(Peddy, 163, MyBrains.MyName, 1);
-                    MyBrains.TimeOn = Game.GameTime + 60000;
-                    MyBrains.Colours = 1;
-                    DataStore.bHackEvent = false;
-                    MyBrains.Friendly = false;
-                    MyBrains.Hacker = true;
-                    Peddy.IsInvincible = true;
-                    Function.Call(Hash.REMOVE_PED_FROM_GROUP, Peddy.Handle);
-                    Peddy.RelationshipGroup = DataStore.GP_Mental;
-                }                        //Hacker
-
-                if (VeHic != null)
-                {
-                    WarptoAnyVeh(VeHic, Peddy, iSeat);
-                    if (iSeat == -1)
-                    {
-                        if (MyBrains.ThisBlip != null)
-                        {
-                            MyBrains.ThisBlip.Remove();
-                            MyBrains.ThisBlip = null;
-                        }
-                        if (MyBrains.DirBlip != null)
-                        {
-                            MyBrains.DirBlip.Remove();
-                            MyBrains.DirBlip = null;
-                        }
-                        DriveTooo(Peddy, !MyBrains.Friendly);
-
-                        MyBrains.ThisBlip = BlipActions.PedBlimp(Peddy, VehActions.OhMyBlip(VeHic), MyBrains.MyName, MyBrains.Colours);
-
-                        if (MyBrains.Friendly)
-                            MyBrains.ThisPed.CanBeDraggedOutOfVehicle = false;
-                        else
-                            Function.Call(Hash.SET_VEHICLE_IS_WANTED, VeHic.Handle, true);
-
-                        MyBrains.ApprochPlayer = true;
-                        MyBrains.Driver = true;
-                    }
-                    else
-                    {
-                        if (MyBrains.ThisBlip != null)
-                        {
-                            MyBrains.ThisBlip.Remove();
-                            MyBrains.ThisBlip = null;
-                        }
-                        if (MyBrains.DirBlip != null)
-                        {
-                            MyBrains.DirBlip.Remove();
-                            MyBrains.DirBlip = null;
-                        }
-                        MyBrains.Passenger = true;
-                    }
-                }
-                else if (ReturnValues.RandInt(0, 40) < 10 && DataStore.MySettings.iAggression > 5)
-                {
-                    if (MyBrains.ThisBlip != null)
-                    {
-                        MyBrains.ThisBlip.Remove();
-                        MyBrains.ThisBlip = null;
-                    }
-                    if (MyBrains.DirBlip != null)
-                    {
-                        MyBrains.DirBlip.Remove();
-                        MyBrains.DirBlip = null;
-                    }
-                    MyBrains.ThisBlip = BlipActions.PedBlimp(Peddy, 303, MyBrains.MyName, 1);
-                    MyBrains.Bounty = true;
-                }
-
-                DataStore.PedList.Add(MyBrains);
-
-                ClearUp.BackItUpBrain();
-
-                if (DataStore.MySettings.iAggression > 1)
-                    GunningIt(Peddy);
-            }
-        }
-        private static PlayerBrain ThisBrian(int iCurrent)
-        {
-            PlayerBrain Brains = null;
-
-            if (iCurrent < DataStore.PedList.Count)
-                Brains = DataStore.PedList[iCurrent];
-
-            return Brains;
-        }
-        private static AfkPlayer ThisAFKer(int iCurrent)
-        {
-            AfkPlayer Afker = null;
-
-            if (iCurrent < DataStore.AFKList.Count)
-                Afker = DataStore.AFKList[iCurrent];
-
-            return Afker;
-        }
-        public static void LaggOut()
-        {
-            LoggerLight.GetLogging("PedActions.LaggOut");
-
-            PlayerDump();
-            bool bSearching = true;
-            while (bSearching)
-            {
-                Script.Wait(100);
-                PlayerDump();
-                if (DataStore.PedList.Count == 0)
-                    bSearching = false;
-            }
-            DataStore.iFollow = 0;
-        }
-        private static void PlayerDump()
-        {
-            LoggerLight.GetLogging("PedActions.PlayerDump");
-
-            for (int i = 0; i < DataStore.PedList.Count; i++)
-            {
-                if (DataStore.PedList[i].ThisPed != null)
-                {
-                    if (DataStore.PedList[i].ThisPed.Exists())
-                    {
-                        GetOutVehicle(DataStore.PedList[i].ThisPed, DataStore.PedList[i].Level);
-                        ClearUp.PedCleaning(DataStore.PedList[i].Level, "left", false);
-                    }
-                    else
-                        DataStore.PedList.RemoveAt(i);
-                }
-                else
-                    DataStore.PedList.RemoveAt(i);
-            }
-
-            for (int i = 0; i < DataStore.AFKList.Count; i++)
-            {
-                ClearUp.DeListingBrains(false, i, true);
-                DataStore.iCurrentPlayerz -= 1;
-            }
-
-            DataStore.MakeFrenz.Clear();
-            DataStore.MakeCarz.Clear();
-            DataStore.GetInQUe.Clear();
-        }
-        private static void GunningIt(Ped Peddy)
+        public static void GunningIt(Ped Peddy)
         {
             LoggerLight.GetLogging("PedActions.GunningIt");
 
@@ -1525,12 +878,28 @@ namespace PlayerZero
 
             int iGun = 0;
 
-            if (DataStore.MySettings.bSpaceWeaps)
-                iGun = ReturnValues.RandInt(0, 8);
-            else
-                iGun = ReturnValues.RandInt(0, 7);
+            if (DataStore.MySettings.Aggression > 1)
+            {
+                if (DataStore.MySettings.Aggression < 3)
+                    iGun = 1;
+                else
+                {
+                    if (DataStore.MySettings.SpaceWeaps)
+                        iGun = RandomNum.FindRandom(14, 2, 10);
+                    else
+                        iGun = RandomNum.FindRandom(14, 2, 9);
+                }
+            }
 
             if (iGun == 1)
+            {
+                sWeapList.Add("WEAPON_dagger");  //0x92A27487",
+                sWeapList.Add("WEAPON_hammer");  //0x4E875F73",
+                sWeapList.Add("WEAPON_battleaxe");  //0xCD274149",
+                sWeapList.Add("WEAPON_golfclub");  //0x440E4788",
+                sWeapList.Add("WEAPON_machete");  //0xDD5DF8D9",
+            }
+            else if (iGun == 2)
             {
                 sWeapList.Add("WEAPON_dagger");  //0x92A27487",
                 sWeapList.Add("WEAPON_pipebomb");  //0xBA45E8B8",
@@ -1539,7 +908,7 @@ namespace PlayerZero
                 sWeapList.Add("WEAPON_sawnoffshotgun");  //0x7846A318",
                 sWeapList.Add("WEAPON_sniperrifle");  //0x5FC3C11",
             }
-            else if (iGun == 2)
+            else if (iGun == 3)
             {
                 sWeapList.Add("WEAPON_hammer");  //0x4E875F73",
                 sWeapList.Add("WEAPON_revolver");  //0xC1B3C3D1",
@@ -1547,7 +916,7 @@ namespace PlayerZero
                 sWeapList.Add("WEAPON_pumpshotgun");  //0x1D073A89",
                 sWeapList.Add("WEAPON_advancedrifle");  //0xAF113F99",
             }
-            else if (iGun == 3)
+            else if (iGun == 4)
             {
                 sWeapList.Add("WEAPON_battleaxe");  //0xCD274149",
                 sWeapList.Add("WEAPON_molotov");  //0x24B17070",
@@ -1556,7 +925,7 @@ namespace PlayerZero
                 sWeapList.Add("WEAPON_musket");  //0xA89CB99E",
                 sWeapList.Add("WEAPON_gusenberg");  //0x61012683"--69
             }
-            else if (iGun == 4)
+            else if (iGun == 5)
             {
                 sWeapList.Add("WEAPON_golfclub");  //0x440E4788",
                 sWeapList.Add("WEAPON_grenade");  //0x93E220BD",
@@ -1564,7 +933,7 @@ namespace PlayerZero
                 sWeapList.Add("WEAPON_assaultshotgun");  //0xE284C527",
                 sWeapList.Add("WEAPON_mg");  //0x9D07F764",
             }
-            else if (iGun == 5)
+            else if (iGun == 6)
             {
                 sWeapList.Add("WEAPON_machete");  //0xDD5DF8D9",
                 sWeapList.Add("WEAPON_heavypistol");  //0xD205520E",
@@ -1572,24 +941,18 @@ namespace PlayerZero
                 sWeapList.Add("WEAPON_specialcarbine");  //0xC0A3098D",
 
             }
-            else if (iGun == 6)
+            else if (iGun == 7)
             {
                 sWeapList.Add("WEAPON_flashlight");  //0x8BB05FD7",
                 sWeapList.Add("WEAPON_GADGETPISTOL");  //0xAF3696A1",--new to cayo ppero
                 sWeapList.Add("WEAPON_MILITARYRIFLE");  //0x624FE830"--65
                 sWeapList.Add("WEAPON_COMBATSHOTGUN");  //0x5A96BA4--54
             }
-            else if (iGun == 7)
+            else if (iGun == 8)
             {
                 sWeapList.Add("WEAPON_marksmanrifle");  //0xC734385A",
             }
-            else if (iGun == 8)
-            {
-                sWeapList.Add("WEAPON_raypistol");  //0xAF3696A1",--36
-                sWeapList.Add("WEAPON_raycarbine");  //0x476BF155"--44
-                sWeapList.Add("weapon_rayminigun");
-            }
-            else
+            else if (iGun == 9)
             {
                 sWeapList.Add("WEAPON_pistol_mk2");  //0xBFE256D4",---------19
                 sWeapList.Add("WEAPON_snspistol_mk2");  //0x88374054",---24
@@ -1603,701 +966,53 @@ namespace PlayerZero
                 sWeapList.Add("WEAPON_heavysniper_mk2");  //0xA914799",---72
                 sWeapList.Add("WEAPON_marksmanrifle_mk2");  //0x6A6C02E0"--74
             }
+            else if (iGun == 10)
+            {
+                sWeapList.Add("WEAPON_raypistol");  //0xAF3696A1",--36
+                sWeapList.Add("WEAPON_raycarbine");  //0x476BF155"--44
+                sWeapList.Add("weapon_rayminigun");
+            }
 
             for (int i = 0; i < sWeapList.Count; i++)
                 Function.Call(Hash.GIVE_WEAPON_TO_PED, Peddy, Function.Call<int>(Hash.GET_HASH_KEY, sWeapList[i]), 9999, false, true);
         }
-        private static int UniqueLevels()
+        public static Ped FindAFight(Ped Attacker)
         {
-            LoggerLight.GetLogging("PedActions.UniqueLevels");
+            Ped Fight = null;
 
-            int iNumber = ReturnValues.FindRandom(14, 1, 1000);
-
-            while (BrainNumberCheck(iNumber))
+            for (int i = 0; i < DataStore.PedList.Count;i++)
             {
-                iNumber = ReturnValues.FindRandom(15, 1, 400);
-            }
-            return iNumber;
-        }
-        private static bool BrainNumberCheck(int iNumber)
-        {
-            bool bRunAgain = false;
-            for (int i = 0; i < DataStore.PedList.Count; i++)
-            {
-                if (DataStore.PedList[i].Level == iNumber)
+                if (DataStore.MySettings.Aggression < 4)
                 {
-                    bRunAgain = true;
-                    break;
-                }
-            }
-            for (int i = 0; i < DataStore.AFKList.Count; i++)
-            {
-                if (DataStore.AFKList[i].Level == iNumber)
-                {
-                    bRunAgain = true;
-                    break;
-                }
-            }
-            return bRunAgain;
-        }
-        private static int WhoShotMe(Ped MeDie)
-        {
-            LoggerLight.GetLogging("PedActions.WhoShotMe");
-
-            int iShoot = -1;
-
-            for (int i = 0; i < DataStore.PedList.Count; i++)
-            {
-                if (MeDie.GetKiller() == DataStore.PedList[i].ThisPed)
-                {
-                    iShoot = i;
-                    break;
-                }
-            }
-            return iShoot;
-        }
-        private static void SearchSeats(Ped pPeddy, Vehicle vVhic, int iPedLevel)
-        {
-            LoggerLight.GetLogging("PedActions.SearchSeats, iPedLevel == " + iPedLevel);
-            GetInAveh MyFinda = new GetInAveh
-            {
-                Peddy = pPeddy,
-                Vhic = vVhic,
-                PedLevel = iPedLevel,
-                Seats = -1
-            };
-            DataStore.GetInQUe.Add(MyFinda); ;
-        }
-        public static void PedDoGetIn(GetInAveh GetingOn)
-        {
-            LoggerLight.GetLogging("PedActions.PedDoGetIn");
-
-            DataStore.iFindingTime = Game.GameTime + 1000;
-            int iSeats = GetingOn.Seats;
-
-            if (iSeats == -1)
-            {
-                while (iSeats < Function.Call<int>(Hash.GET_VEHICLE_MAX_NUMBER_OF_PASSENGERS, GetingOn.Vhic.Handle))
-                {
-                    if (Function.Call<bool>(Hash.IS_VEHICLE_SEAT_FREE, GetingOn.Vhic.Handle, iSeats))
+                    if (DataStore.PedList[i].ThisPed != Attacker)
+                    {
+                        Fight = DataStore.PedList[i].ThisPed;
                         break;
-                    else
-                        iSeats += 1;
+                    }
                 }
-                if (iSeats < Function.Call<int>(Hash.GET_VEHICLE_MAX_NUMBER_OF_PASSENGERS, GetingOn.Vhic.Handle))
-                    DataStore.GetInQUe[0].Seats = iSeats;
                 else
-                    iSeats = -1;
+                {
+                    if (!DataStore.PedList[i].Friendly)
+                    {
+                        Fight = DataStore.PedList[i].ThisPed;
+                        break;
+                    }
+                }
             }
 
-            if (iSeats != -1)
-            {
-                if (GetingOn.Peddy.Position.DistanceTo(GetingOn.Vhic.Position) < 65.00f)
-                {
-                    if (GetingOn.Peddy.Position.DistanceTo(GetingOn.Vhic.Position) > 65.00f)
-                        WarptoAnyVeh(GetingOn.Vhic, GetingOn.Peddy, GetingOn.Seats);
-                    else if (!Function.Call<bool>(Hash.IS_PED_GETTING_INTO_A_VEHICLE, GetingOn.Peddy.Handle))
-                        Function.Call(Hash.TASK_ENTER_VEHICLE, GetingOn.Peddy.Handle, GetingOn.Vhic.Handle, -1, GetingOn.Seats, 1.50f, 1, 0);
-                }
-                else
-                    WarptoAnyVeh(GetingOn.Vhic, GetingOn.Peddy, iSeats);
-            }
-            else
-            {
-                if (GetingOn.PedLevel != -1)
-                {
-                    int iBPed = ReteaveBrain(GetingOn.PedLevel);
-                    if (DataStore.PedList[iBPed].ThisVeh != null)
-                        DataStore.PedList[iBPed].ThisVeh.MarkAsNoLongerNeeded();
-                    DataStore.GetInQUe.RemoveAt(0);
-                    FindStuff.SearchVeh(1.00f, 95.00f, VehActions.RandVeh(ReturnValues.RandInt(1, 9)), false, GetingOn.PedLevel);
-                }
-            }
+            return Fight;
         }
-        public static void PlayerZerosAI()
+        public static void PickFight(Ped Attacker, Vehicle Plane, Ped fight, int iVehType)
         {
-            if (DataStore.bDisabled)
+            if (fight != null)
             {
-                if (ThisBrian(0) != null || ThisAFKer(0) != null)
-                    LaggOut();
-            }
-            else
-            {
-                if (ThisBrian(DataStore.iNpcList) != null)
-                {
-                    int iBe = DataStore.iNpcList;
-                    if (DataStore.PedList[iBe].DirBlip != null)
-                        BlipActions.BlipDirect(DataStore.PedList[iBe].DirBlip, DataStore.PedList[iBe].ThisPed.Heading);
-
-                    if (DataStore.PedList[iBe].ThisPed == null)
-                    {
-
-                    }
-                    else if (DataStore.PedList[iBe].EnterVehQue)
-                    {
-                        if (!Game.Player.Character.IsInVehicle())
-                        {
-                            DataStore.PedList[iBe].EnterVehQue = false;
-                            DataStore.GetInQUe.Clear();
-                        }
-                    }
-                    else if (DataStore.PedList[iBe].TimeOn < Game.GameTime)
-                    {
-                        DataStore.PedList[iBe].AirAttack = 0;
-                        Function.Call(Hash.REMOVE_PED_FROM_GROUP, DataStore.PedList[iBe].ThisPed.Handle);
-                        GetOutVehicle(DataStore.PedList[iBe].ThisPed, DataStore.PedList[iBe].Level);
-                        ClearUp.PedCleaning(DataStore.PedList[iBe].Level, "left", false);
-                    }
-                    else if (Game.Player.Character.GetKiller() == DataStore.PedList[iBe].ThisPed)
-                    {
-                        DataStore.PedList[iBe].Kills += 1;
-                        WhileYouDead(DataStore.PedList[iBe].MyName, DataStore.PedList[iBe].Killed, DataStore.PedList[iBe].Kills, DataStore.PedList[iBe].ThisPed);
-                        if (DataStore.MySettings.iAggression < 6)
-                            ClearUp.PedCleaning(DataStore.PedList[iBe].Level, "left", false);
-                    }
-                    else if (DataStore.PedList[iBe].ThisPed.IsDead)
-                    {
-                        if (DataStore.PedList[iBe].DeathSequence == 0)
-                        {
-                            DataStore.PedList[iBe].AirAttack = 0;
-
-                            if (DataStore.PedList[iBe].ThisOppress != null)
-                            {
-                                EmptyVeh(DataStore.PedList[iBe].ThisOppress);
-                                DataStore.PedList[iBe].ThisOppress.Explode();
-                                DataStore.PedList[iBe].ThisOppress.MarkAsNoLongerNeeded();
-                                DataStore.PedList[iBe].ThisOppress = null;
-
-                                if (DataStore.PedList[iBe].ThisVeh != null)
-                                {
-                                    EmptyVeh(DataStore.PedList[iBe].ThisVeh);
-                                    DataStore.PedList[iBe].ThisVeh.Delete();
-                                    DataStore.PedList[iBe].ThisVeh = null;
-                                }
-                            }
-                            else if (DataStore.PedList[iBe].ThisVeh != null)
-                            {
-                                EmptyVeh(DataStore.PedList[iBe].ThisVeh);
-                                DataStore.PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
-                                DataStore.PedList[iBe].ThisVeh = null;
-                            }
-
-                            int iDie = WhoShotMe(DataStore.PedList[iBe].ThisPed);
-
-                            ClearUp.ClearPedBlips(DataStore.PedList[iBe].Level);
-
-                            if (DataStore.PedList[iBe].ThisPed.GetKiller() == Game.Player.Character)
-                            {
-                                if (DataStore.PedList[iBe].Bounty)
-                                    Game.Player.Money += 7000;
-                                DataStore.PedList[iBe].Friendly = false;
-                                DataStore.PedList[iBe].Colours = 1;
-                                DataStore.PedList[iBe].ApprochPlayer = false;
-                                Function.Call(Hash.REMOVE_PED_FROM_GROUP, DataStore.PedList[iBe].ThisPed.Handle);
-                                DataStore.PedList[iBe].Follower = false;
-                                DataStore.PedList[iBe].Killed += 1;
-                                UI.Notify("You  " + DataStore.PedList[iBe].Killed + " - " + DataStore.PedList[iBe].Kills + " " + DataStore.PedList[iBe].MyName);
-                            }
-                            else if (iDie != -1)
-                                UI.Notify(DataStore.PedList[iDie].MyName + " Killed " + DataStore.PedList[iBe].MyName);
-                            else
-                                UI.Notify(DataStore.PedList[iBe].MyName + " died");
-
-                            DataStore.PedList[iBe].Bounty = false;
-                            DataStore.PedList[iBe].DeathSequence += 1;
-                            DataStore.PedList[iBe].DeathTime = Game.GameTime + 10000;
-                            DataStore.PedList[iBe].TimeOn += 60000;
-                            Function.Call(Hash.REMOVE_PED_FROM_GROUP, DataStore.PedList[iBe].ThisPed.Handle);
-                        }
-                        else if (DataStore.PedList[iBe].DeathSequence == 1 || DataStore.PedList[iBe].DeathSequence == 3 || DataStore.PedList[iBe].DeathSequence == 5 || DataStore.PedList[iBe].DeathSequence == 7)
-                        {
-                            if (DataStore.PedList[iBe].DeathTime < Game.GameTime)
-                            {
-                                DataStore.PedList[iBe].ThisPed.Alpha = 80;
-                                DataStore.PedList[iBe].DeathSequence += 1;
-                                DataStore.PedList[iBe].DeathTime = Game.GameTime + 500;
-                            }
-                        }
-                        else if (DataStore.PedList[iBe].DeathSequence == 2 || DataStore.PedList[iBe].DeathSequence == 4 || DataStore.PedList[iBe].DeathSequence == 6)
-                        {
-                            if (DataStore.PedList[iBe].DeathTime < Game.GameTime)
-                            {
-                                DataStore.PedList[iBe].ThisPed.Alpha = 255;
-                                DataStore.PedList[iBe].DeathSequence += 1;
-                                DataStore.PedList[iBe].DeathTime = Game.GameTime + 500;
-                            }
-                        }
-                        else if (DataStore.PedList[iBe].DeathSequence == 8)
-                        {
-                            if (DataStore.PedList[iBe].DeathTime < Game.GameTime)
-                            {
-                                if (DataStore.PedList[iBe].Killed > ReturnValues.RandInt(13, 22) || DataStore.MySettings.iAggression < 2)
-                                {
-                                    ClearUp.PedCleaning(DataStore.PedList[iBe].Level, "left", false);
-                                }
-                                else
-                                {
-                                    ClearUp.ClearPedBlips(DataStore.PedList[iBe].Level);
-                                    DataStore.PedList[iBe].DeathSequence = 10;
-                                    Function.Call(Hash.REMOVE_PED_FROM_GROUP, DataStore.PedList[iBe].ThisPed.Handle);
-                                    DataStore.PedList[iBe].ThisPed.Delete();
-                                    DataStore.PedList[iBe].ThisPed = null;
-                                    FindStuff.SearchPed(35.00f, 220.00f, null, 0, DataStore.PedList[iBe].Level);
-                                }
-
-                                //else if (DataStore.PedList[iBe].Killed > 15 && DataStore.PedList[iBe].Kills == 0 && DataStore.MySettings.iAggression > 7)
-                                //    FireOrb(DataStore.PedList[iBe].Level, Game.Player.Character, false);
-                            }
-                        }
-                    }
-                    else if (DataStore.PedList[iBe].ThisPed.Position.Z + 10.00f < World.GetGroundHeight(DataStore.PedList[iBe].ThisPed.Position))
-                    {
-                        if (DataStore.PedList[iBe].Befallen)
-                        {
-                            if (DataStore.PedList[iBe].DeathTime < Game.GameTime)
-                                DataStore.PedList[iBe].ThisPed.Kill();
-                        }
-                        else
-                        {
-                            DataStore.PedList[iBe].Befallen = true;
-                            DataStore.PedList[iBe].DeathTime = Game.GameTime + 5000;
-                        }
-                    }
-                    else if (DataStore.PedList[iBe].Befallen)
-                        DataStore.PedList[iBe].Befallen = false;
-                    else if (DataStore.PedList[iBe].Hacker && !DataStore.bHackEvent)
-                    {
-                        if (DataStore.PedList[iBe].ThisPed.Position.DistanceTo(ReturnValues.YoPoza()) < 40.00f)
-                        {
-                            DataStore.bHackEvent = true;
-                            HackerTime(DataStore.PedList[iBe].ThisPed);
-                        }
-                    }
-                    else if (DataStore.PedList[iBe].SessionJumper)
-                    {
-                        if (DataStore.PedList[iBe].ThisPed.Position.DistanceTo(ReturnValues.YoPoza()) < 10.00f)
-                            ClearUp.PedCleaning(DataStore.PedList[iBe].Level, "has disappeared", true);
-                    }
-                    else if (DataStore.PedList[iBe].AirAttack != 0)
-                    {
-                        if (!DataStore.PedList[iBe].ThisPed.IsInVehicle())
-                            DataStore.PedList[iBe].AirAttack = 0;
-                        else if (DataStore.PedList[iBe].FindPlayer < Game.GameTime)
-                        {
-                            DataStore.PedList[iBe].FindPlayer = Game.GameTime + 5000;
-                            if (Game.Player.Character.IsInVehicle())
-                            {
-                                if (DataStore.PedList[iBe].AirAttack == 1)
-                                    FlyAway(DataStore.PedList[iBe].ThisPed, ReturnValues.YoPoza(), 250.00f, 0.00f);
-                                else if (DataStore.PedList[iBe].AirAttack == 2)
-                                {
-                                    int iFlight = 6;
-                                    if (DataStore.MySettings.iAggression > 8)
-                                        iFlight = 2;
-
-                                    Function.Call(Hash.TASK_PLANE_MISSION, DataStore.PedList[iBe].ThisPed.Handle, DataStore.PedList[iBe].ThisVeh.Handle, Game.Player.Character.CurrentVehicle.Handle, 0, 0, 0, 0, iFlight, 0.0f, 0.0f, DataStore.PedList[iBe].AirDirect, 1000.0f, -5000.0f);
-                                }
-                                else if (DataStore.PedList[iBe].AirAttack == 3)
-                                    Function.Call(Hash.TASK_PLANE_MISSION, DataStore.PedList[iBe].ThisPed.Handle, DataStore.PedList[iBe].ThisVeh.Handle, Game.Player.Character.CurrentVehicle.Handle, 0, 0, 0, 0, 6, 0.0f, 0.0f, DataStore.PedList[iBe].AirDirect, 300.0f, -5000.0f);
-                            }
-                            else
-                            {
-                                if (DataStore.PedList[iBe].AirAttack == 1)
-                                    FlyAway(DataStore.PedList[iBe].ThisPed, ReturnValues.YoPoza(), 250.00f, 0.00f);
-                                else if (DataStore.PedList[iBe].AirAttack == 2)
-                                {
-                                    int iFlight = 6;
-                                    if (DataStore.MySettings.iAggression > 8)
-                                        iFlight = 2;
-
-                                    Function.Call(Hash.TASK_PLANE_MISSION, DataStore.PedList[iBe].ThisPed.Handle, DataStore.PedList[iBe].ThisVeh.Handle, 0, Game.Player.Character.Handle, 0, 0, 0, iFlight, 0.0f, 0.0f, DataStore.PedList[iBe].AirDirect, 1000.0f, -5000.0f);
-                                }
-                                else if (DataStore.PedList[iBe].AirAttack == 3)
-                                    Function.Call(Hash.TASK_PLANE_MISSION, DataStore.PedList[iBe].ThisPed.Handle, DataStore.PedList[iBe].ThisVeh.Handle, 0, Game.Player.Character.Handle, 0, 0, 0, 6, 0.0f, 0.0f, DataStore.PedList[iBe].AirDirect, 300.0f, -5000.0f);
-                            }
-                        }
-                    }
-                    else if (DataStore.PedList[iBe].Driver)
-                    {
-                        if (DataStore.PedList[iBe].ThisVeh != null)
-                        {
-                            if (DataStore.PedList[iBe].ThisPed.IsInVehicle())
-                            {
-
-                                if (DataStore.PedList[iBe].DirBlip != null)
-                                {
-                                    ClearUp.ClearPedBlips(DataStore.PedList[iBe].Level);
-                                    DataStore.PedList[iBe].ThisBlip = BlipActions.PedBlimp(DataStore.PedList[iBe].ThisPed, VehActions.OhMyBlip(DataStore.PedList[iBe].ThisVeh), DataStore.PedList[iBe].MyName, DataStore.PedList[iBe].Colours);
-                                }
-                                else if (DataStore.PedList[iBe].Follower)
-                                {
-                                    if (Game.Player.Character.IsInVehicle(DataStore.PedList[iBe].ThisPed.CurrentVehicle))
-                                    {
-                                        if (Game.IsWaypointActive)
-                                        {
-                                            if (World.GetWaypointPosition() != DataStore.LetsGoHere)
-                                            {
-                                                DataStore.LetsGoHere = World.GetWaypointPosition();
-                                                DriveToooDest(DataStore.PedList[iBe].ThisPed, DataStore.LetsGoHere);
-                                            }
-                                        }
-                                    }
-                                    else if (Game.Player.Character.IsInVehicle())
-                                    {
-                                        if (DataStore.PedList[iBe].ThisBlip == null)
-                                            DataStore.PedList[iBe].ThisBlip = BlipActions.PedBlimp(DataStore.PedList[iBe].ThisPed, 225, DataStore.PedList[iBe].MyName, DataStore.PedList[iBe].Colours);
-
-                                        if (ReturnValues.YoPoza().DistanceTo(DataStore.PedList[iBe].ThisPed.Position) > 25.00f)
-                                        {
-                                            if (DataStore.PedList[iBe].FindPlayer < Game.GameTime)
-                                            {
-                                                DataStore.PedList[iBe].FindPlayer = Game.GameTime + 5000;
-                                                DriveTooo(DataStore.PedList[iBe].ThisPed, false);
-                                            }
-                                        }
-                                    }
-                                    else
-                                    {
-                                        GetOutVehicle(DataStore.PedList[iBe].ThisPed, DataStore.PedList[iBe].Level);
-                                        if (DataStore.PedList[iBe].ThisVeh != null)
-                                        {
-                                            DataStore.PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
-                                            DataStore.PedList[iBe].ThisVeh = null;
-                                        }
-                                        DataStore.PedList[iBe].Passenger = false;
-                                        DataStore.PedList[iBe].Driver = false;
-                                        OhDoKeepUp(DataStore.PedList[iBe].ThisPed);
-                                    }
-                                }
-                                else if (DataStore.PedList[iBe].ApprochPlayer)
-                                {
-                                    if (DataStore.MySettings.iAggression < 9 && DataStore.PedList[iBe].Friendly && DataStore.iFollow < 7)
-                                    {
-                                        if (ReturnValues.YoPoza().DistanceTo(DataStore.PedList[iBe].ThisPed.Position) < 5.00f)
-                                        {
-                                            if (!DataStore.PedList[iBe].Horny)
-                                            {
-                                                DataStore.PedList[iBe].Horny = true;
-                                                DataStore.PedList[iBe].ThisVeh.SoundHorn(3000);
-                                                ScaleDisp.TopLeftUI("Press" + DataStore.ControlSym[23] + "to enter vehicle");
-                                            }
-                                            else if (!Game.Player.Character.IsInVehicle())
-                                            {
-                                                if (ReturnValues.ButtonDown(23, true))
-                                                {
-                                                    DataStore.PedList[iBe].TimeOn = Game.GameTime + 600000;
-                                                    DataStore.PedList[iBe].ApprochPlayer = false;
-                                                    DataStore.PedList[iBe].Colours = 38;
-                                                    DataStore.PedList[iBe].Follower = true;
-                                                    FolllowTheLeader(DataStore.PedList[iBe].ThisPed);
-                                                    DataStore.iFollow += 1;
-                                                    PlayerEnterVeh(DataStore.PedList[iBe].ThisVeh);
-                                                    DriveAround(DataStore.PedList[iBe].ThisPed);
-                                                }
-                                            }
-                                            else
-                                            {
-                                                DataStore.PedList[iBe].ApprochPlayer = false;
-                                                DriveAround(DataStore.PedList[iBe].ThisPed);
-                                            }
-                                        }
-                                        else if (ReturnValues.YoPoza().DistanceTo(DataStore.PedList[iBe].ThisPed.Position) > 25.00f)
-                                        {
-                                            if (DataStore.PedList[iBe].FindPlayer < Game.GameTime)
-                                            {
-                                                DataStore.PedList[iBe].FindPlayer = Game.GameTime + 5000;
-                                                DriveTooo(DataStore.PedList[iBe].ThisPed, false);
-                                            }
-                                        }
-                                    }
-                                    else if (DataStore.MySettings.iAggression > 8)
-                                    {
-                                        if (DataStore.PedList[iBe].FindPlayer < Game.GameTime)
-                                        {
-                                            DataStore.PedList[iBe].FindPlayer = Game.GameTime + 5000;
-                                            DriveBye(DataStore.PedList[iBe].ThisPed);
-                                        }
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                if (DataStore.PedList[iBe].Follower)
-                                {
-                                    if (DataStore.PedList[iBe].ThisPed.IsInCombat)
-                                    {
-                                        if (DataStore.PedList[iBe].DirBlip == null)
-                                        {
-                                            ClearUp.ClearPedBlips(DataStore.PedList[iBe].Level);
-                                            DataStore.PedList[iBe].DirBlip = BlipActions.DirectionalBlimp(DataStore.PedList[iBe].ThisPed);
-                                            DataStore.PedList[iBe].ThisBlip = BlipActions.PedBlimp(DataStore.PedList[iBe].ThisPed, 1, DataStore.PedList[iBe].MyName, DataStore.PedList[iBe].Colours);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        if (Game.Player.Character.IsInVehicle())
-                                        {
-                                            if (DataStore.PedList[iBe].ThisVeh != null)
-                                            {
-                                                DataStore.PedList[iBe].EnterVehQue = true;
-                                                SearchSeats(DataStore.PedList[iBe].ThisPed, DataStore.PedList[iBe].ThisVeh, DataStore.PedList[iBe].Level);
-                                            }
-                                            else
-                                                DataStore.PedList[iBe].Driver = false;
-                                        }
-                                        else
-                                        {
-                                            if (DataStore.PedList[iBe].ThisVeh != null)
-                                            {
-                                                DataStore.PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
-                                                DataStore.PedList[iBe].ThisVeh = null;
-                                            }
-                                            DataStore.PedList[iBe].Driver = false;
-
-                                            if (DataStore.PedList[iBe].DirBlip == null)
-                                            {
-                                                ClearUp.ClearPedBlips(DataStore.PedList[iBe].Level);
-                                                DataStore.PedList[iBe].DirBlip = BlipActions.DirectionalBlimp(DataStore.PedList[iBe].ThisPed);
-                                                DataStore.PedList[iBe].ThisBlip = BlipActions.PedBlimp(DataStore.PedList[iBe].ThisPed, 1, DataStore.PedList[iBe].MyName, DataStore.PedList[iBe].Colours);
-                                            }
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    EmptyVeh(DataStore.PedList[iBe].ThisVeh);
-                                    DataStore.PedList[iBe].ThisVeh.MarkAsNoLongerNeeded();
-                                    DataStore.PedList[iBe].ThisVeh = null;
-
-                                    if (DataStore.PedList[iBe].DirBlip == null)
-                                    {
-                                        ClearUp.ClearPedBlips(DataStore.PedList[iBe].Level);
-                                        DataStore.PedList[iBe].DirBlip = BlipActions.DirectionalBlimp(DataStore.PedList[iBe].ThisPed);
-                                        DataStore.PedList[iBe].ThisBlip = BlipActions.PedBlimp(DataStore.PedList[iBe].ThisPed, 1, DataStore.PedList[iBe].MyName, DataStore.PedList[iBe].Colours);
-                                    }
-                                }
-                            }
-                        }
-                        else
-                            DataStore.PedList[iBe].Driver = false;
-                    }
-                    else if (DataStore.PedList[iBe].Passenger)
-                    {
-                        if (DataStore.PedList[iBe].Follower)
-                        {
-                            if (!Game.Player.Character.IsInVehicle())
-                            {
-                                DataStore.PedList[iBe].Passenger = false;
-                                ClearUp.ClearPedBlips(DataStore.PedList[iBe].Level);
-                                DataStore.PedList[iBe].DirBlip = BlipActions.DirectionalBlimp(DataStore.PedList[iBe].ThisPed);
-                                DataStore.PedList[iBe].ThisBlip = BlipActions.PedBlimp(DataStore.PedList[iBe].ThisPed, 1, DataStore.PedList[iBe].MyName, DataStore.PedList[iBe].Colours);
-                                DataStore.PedList[iBe].ThisPed.Task.LeaveVehicle();
-                                OhDoKeepUp(DataStore.PedList[iBe].ThisPed);
-                            }
-                        }
-                        else
-                        {
-                            if (!DataStore.PedList[iBe].ThisPed.IsInVehicle())
-                            {
-                                DataStore.PedList[iBe].Passenger = false;
-                                ClearUp.ClearPedBlips(DataStore.PedList[iBe].Level);
-                                DataStore.PedList[iBe].DirBlip = BlipActions.DirectionalBlimp(DataStore.PedList[iBe].ThisPed);
-                                DataStore.PedList[iBe].ThisBlip = BlipActions.PedBlimp(DataStore.PedList[iBe].ThisPed, 1, DataStore.PedList[iBe].MyName, DataStore.PedList[iBe].Colours);
-                            }
-                            else if (Game.Player.Character.IsInVehicle(DataStore.PedList[iBe].ThisPed.CurrentVehicle) && DataStore.PedList[iBe].Friendly && DataStore.iFollow < 7)
-                            {
-                                FolllowTheLeader(DataStore.PedList[iBe].ThisPed);
-                                DataStore.PedList[iBe].Colours = 38;
-                                DataStore.PedList[iBe].Follower = true;
-                                DataStore.iFollow += 1;
-                            }
-                        }
-                    }
-                    else if (DataStore.PedList[iBe].Follower)
-                    {
-                        if (Game.Player.Character.IsInVehicle())
-                        {
-                            DataStore.PedList[iBe].Passenger = true;
-                            Vehicle DisVeh = Game.Player.Character.CurrentVehicle;
-                            SearchSeats(DataStore.PedList[iBe].ThisPed, DisVeh, DataStore.PedList[iBe].Level);
-                            DataStore.PedList[iBe].EnterVehQue = true;
-                            DataStore.PedList[iBe].TimeOn += 60000;
-                        }
-                        else if (ReturnValues.YoPoza().DistanceTo(DataStore.PedList[iBe].ThisPed.Position) > 150.00f)
-                        {
-                            DataStore.PedList[iBe].ThisPed.Position = ReturnValues.YoPoza() + (Game.Player.Character.RightVector * 2);
-                            OhDoKeepUp(DataStore.PedList[iBe].ThisPed);
-                        }
-                    }
-                    else if (DataStore.PedList[iBe].Friendly)
-                    {
-                        if (DataStore.PedList[iBe].ThisPed.HasBeenDamagedBy(Game.Player.Character) || DataStore.PedList[iBe].ThisPed.IsInCombatAgainst(Game.Player.Character) && DataStore.MySettings.iAggression > 2)
-                        {
-                            ClearUp.ClearPedBlips(DataStore.PedList[iBe].Level);
-                            DataStore.PedList[iBe].Colours = 1;
-                            if (DataStore.MySettings.iAggression < 5)
-                                DataStore.PedList[iBe].TimeOn = Game.GameTime + 120000;
-                            else
-                                DataStore.PedList[iBe].TimeOn += 120000;
-
-                            FightPlayer(DataStore.PedList[iBe].ThisPed, false);
-                            DataStore.PedList[iBe].Friendly = false;
-                            if (DataStore.PedList[iBe].Follower)
-                            {
-                                Function.Call(Hash.REMOVE_PED_FROM_GROUP, DataStore.PedList[iBe].ThisPed.Handle);
-                                DataStore.PedList[iBe].Follower = false;
-                                DataStore.iFollow -= 1;
-                            }
-                            DataStore.PedList[iBe].DirBlip = BlipActions.DirectionalBlimp(DataStore.PedList[iBe].ThisPed);
-                            DataStore.PedList[iBe].ThisBlip = BlipActions.PedBlimp(DataStore.PedList[iBe].ThisPed, 1, DataStore.PedList[iBe].MyName, DataStore.PedList[iBe].Colours);
-                        }
-                        else
-                        {
-                            if (ReturnValues.YoPoza().DistanceTo(DataStore.PedList[iBe].ThisPed.Position) < 7.00f && !DataStore.PedList[iBe].ThisPed.IsInVehicle() && DataStore.iFollow < 7)
-                            {
-                                if (Game.Player.Character.IsInVehicle())
-                                {
-                                    if (Game.Player.Character.SeatIndex == VehicleSeat.Driver)
-                                    {
-                                        if (!DataStore.PedList[iBe].Horny2)
-                                        {
-                                            ScaleDisp.TopLeftUI("Press" + DataStore.ControlSym[86] + "to attract the players attention");
-                                            DataStore.PedList[iBe].Horny2 = true;
-                                        }
-                                        else if (ReturnValues.ButtonDown(86, false))
-                                        {
-                                            if (DataStore.MySettings.iAggression < 9)
-                                            {
-                                                ClearUp.ClearPedBlips(DataStore.PedList[iBe].Level);
-
-                                                DataStore.PedList[iBe].Colours = 38;
-                                                DataStore.PedList[iBe].DirBlip = BlipActions.DirectionalBlimp(DataStore.PedList[iBe].ThisPed);
-                                                DataStore.PedList[iBe].ThisBlip = BlipActions.PedBlimp(DataStore.PedList[iBe].ThisPed, 1, DataStore.PedList[iBe].MyName, DataStore.PedList[iBe].Colours);
-                                                FolllowTheLeader(DataStore.PedList[iBe].ThisPed);
-                                                OhDoKeepUp(DataStore.PedList[iBe].ThisPed);
-                                                DataStore.PedList[iBe].TimeOn = Game.GameTime + 600000;
-                                                DataStore.iFollow += 1;
-
-                                                DataStore.PedList[iBe].Follower = true;
-                                            }
-                                            else
-                                            {
-                                                ClearUp.ClearPedBlips(DataStore.PedList[iBe].Level);
-                                                FightPlayer(DataStore.PedList[iBe].ThisPed, false);
-                                                DataStore.PedList[iBe].Colours = 3;
-                                                DataStore.PedList[iBe].Friendly = false;
-                                                DataStore.PedList[iBe].DirBlip = BlipActions.DirectionalBlimp(DataStore.PedList[iBe].ThisPed);
-                                                DataStore.PedList[iBe].ThisBlip = BlipActions.PedBlimp(DataStore.PedList[iBe].ThisPed, 1, DataStore.PedList[iBe].MyName, DataStore.PedList[iBe].Colours);
-                                            }
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    if (!DataStore.PedList[iBe].Horny2)
-                                    {
-                                        ScaleDisp.TopLeftUI("Press" + DataStore.ControlSym[46] + "to invte this player");
-                                        DataStore.PedList[iBe].Horny2 = true;
-                                    }
-                                    else if (ReturnValues.ButtonDown(46, false))
-                                    {
-                                        if (DataStore.MySettings.iAggression < 9)
-                                        {
-                                            ClearUp.ClearPedBlips(DataStore.PedList[iBe].Level);
-
-                                            DataStore.PedList[iBe].Colours = 38;
-                                            DataStore.PedList[iBe].DirBlip = BlipActions.DirectionalBlimp(DataStore.PedList[iBe].ThisPed);
-                                            DataStore.PedList[iBe].ThisBlip = BlipActions.PedBlimp(DataStore.PedList[iBe].ThisPed, 1, DataStore.PedList[iBe].MyName, DataStore.PedList[iBe].Colours);
-                                            FolllowTheLeader(DataStore.PedList[iBe].ThisPed);
-                                            OhDoKeepUp(DataStore.PedList[iBe].ThisPed);
-                                            DataStore.PedList[iBe].TimeOn = Game.GameTime + 600000;
-                                            DataStore.iFollow += 1;
-
-                                            DataStore.PedList[iBe].Follower = true;
-                                        }
-                                        else
-                                        {
-                                            ClearUp.ClearPedBlips(DataStore.PedList[iBe].Level);
-                                            FightPlayer(DataStore.PedList[iBe].ThisPed, false);
-                                            DataStore.PedList[iBe].Colours = 3;
-                                            DataStore.PedList[iBe].Friendly = false;
-                                            DataStore.PedList[iBe].DirBlip = BlipActions.DirectionalBlimp(DataStore.PedList[iBe].ThisPed);
-                                            DataStore.PedList[iBe].ThisBlip = BlipActions.PedBlimp(DataStore.PedList[iBe].ThisPed, 1, DataStore.PedList[iBe].MyName, DataStore.PedList[iBe].Colours);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        if (!DataStore.PedList[iBe].OffRadarBool && DataStore.PedList[iBe].OffRadar == -1)
-                        {
-
-                            DataStore.PedList[iBe].OffRadar = Game.GameTime + 300000;
-                            ClearUp.ClearPedBlips(DataStore.PedList[iBe].Level);
-                            UI.Notify("~h~" + DataStore.PedList[iBe].MyName + "~s~ has gone off radar");
-                        }
-                        else if (DataStore.PedList[iBe].OffRadarBool)
-                        {
-                            if (DataStore.PedList[iBe].OffRadar < Game.GameTime)
-                            {
-                                DataStore.PedList[iBe].OffRadarBool = false;
-                                ClearUp.ClearPedBlips(DataStore.PedList[iBe].Level);
-                                DataStore.PedList[iBe].DirBlip = BlipActions.DirectionalBlimp(DataStore.PedList[iBe].ThisPed);
-                                DataStore.PedList[iBe].ThisBlip = BlipActions.PedBlimp(DataStore.PedList[iBe].ThisPed, 1, DataStore.PedList[iBe].MyName, DataStore.PedList[iBe].Colours);
-                            }
-                        }
-                        else if (DataStore.PedList[iBe].ThisPed.Position.DistanceTo(ReturnValues.YoPoza()) > 350.00f && DataStore.MySettings.iAggression > 6 && DataStore.PedList[iBe].DeathSequence == 0)
-                        {
-                            if (DataStore.PedList[iBe].ThisVeh == null)
-                                AirAttack(DataStore.PedList[iBe].Level);
-                        }
-                        else if (DataStore.bPiggyBack)
-                        {
-                            if (DataStore.PedList[iBe].ThisPed.IsInCombatAgainst(Game.Player.Character))
-                            {
-                                if (DataStore.iOrbBurnOut < Game.GameTime)
-                                {
-                                    DataStore.iOrbBurnOut = Game.GameTime + 25000;
-
-                                    //FireOrb(DataStore.PedList[iBe].Level, DataStore.PedList[iBe].ThisPed, true);
-                                }
-                            }
-                        }
-                    }
-
-                    DataStore.iNpcList += 1;
-                }
+                if (iVehType == 1 || iVehType == 6) 
+                    DriveBye(Attacker, fight);
+                else if (iVehType == 2 || iVehType == 4)
+                    FlyHeli(Attacker, Plane, fight.Position, 45.00f, 0.00f);
                 else
-                    DataStore.iNpcList = 0;
-
-                if (ThisAFKer(DataStore.iBlpList) != null)
-                {
-                    AfkPlayer HouseBlip = ThisAFKer(DataStore.iBlpList);
-
-                    if (HouseBlip.TimeOn < Game.GameTime)
-                    {
-                        ClearUp.DeListingBrains(false, DataStore.iBlpList, true);
-                        DataStore.iCurrentPlayerz -= 1;
-                    }
-                    DataStore.iBlpList += 1;
-                }
-                else
-                    DataStore.iBlpList = 0;
-
-                if (ReturnValues.BTimer(1))
-                    NewPlayer();
+                    FlyPlane(Attacker, Plane, Vector3.Zero, fight);
             }
-        }
-        private static void WhileYouDead(string Kellar, int iKills, int iKilled, Ped Peddy)
-        {
-            LoggerLight.GetLogging("PedActions.WhileYouDead, string == " + Kellar + ", iKills == " + iKills + ", iKilled == " + iKilled);
-
-            while (Game.Player.Character.GetKiller() == Peddy)
-                Script.Wait(1);
-            Script.Wait(1000);
-            UI.Notify("You  " + iKills + " - " + iKilled + " " + Kellar);
         }
     }
 }

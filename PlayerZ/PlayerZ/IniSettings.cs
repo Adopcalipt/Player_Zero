@@ -5,8 +5,7 @@ namespace PlayerZero
 {
     public class IniSettings
     {
-        private static readonly string sPath = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/PZSet.ini";
-        private static IniFile MyIni = null;
+        private static readonly string sPath = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/Settings.ini";
 
         public static void WriteSettingsIni()
         {
@@ -14,49 +13,51 @@ namespace PlayerZero
 
             IniFile IniBuild = new IniFile();
 
-            IniBuild.Write("Aggression", "" + DataStore.MySettings.iAggression + "", "Settings");
-            IniBuild.Write("MaxPlayers", "" + DataStore.MySettings.iMaxPlayers + "", "Settings");
-            IniBuild.Write("MinWait", "" + DataStore.MySettings.iMinWait + "", "Settings");
-            IniBuild.Write("MaxWait", "" + DataStore.MySettings.iMaxWait + "", "Settings");
-            IniBuild.Write("MinSession", "" + DataStore.MySettings.iMinSession + "", "Settings");
-            IniBuild.Write("MaxSession", "" + DataStore.MySettings.iMaxSession + "", "Settings");
-            IniBuild.Write("MinAccuracy", "" + DataStore.MySettings.iAccMin + "", "Settings");
-            IniBuild.Write("MaxAccuracy", "" + DataStore.MySettings.iAccMax + "", "Settings");
-            IniBuild.Write("SpaceWeaps", "" + DataStore.MySettings.bSpaceWeaps + "", "Settings");
-            IniBuild.Write("Debug", "" + DataStore.MySettings.bDebugger + "", "Settings");
-            IniBuild.Write("Players", "" + DataStore.MySettings.iGetlayList + "", "Controls");
-            IniBuild.Write("ClearPlayers", "" + DataStore.MySettings.iClearPlayList + "", "Controls");
-            IniBuild.Write("DisableMod", "" + DataStore.MySettings.iDisableMod + "", "Controls");
+            IniBuild.Write("Aggression", "" + DataStore.MySettings.Aggression + "", "Settings");
+            IniBuild.Write("MaxPlayers", "" + DataStore.MySettings.MaxPlayers + "", "Settings");
+            IniBuild.Write("MinWait", "" + DataStore.MySettings.MinWait + "", "Settings");
+            IniBuild.Write("MaxWait", "" + DataStore.MySettings.MaxWait + "", "Settings");
+            IniBuild.Write("MinSession", "" + DataStore.MySettings.MinSession + "", "Settings");
+            IniBuild.Write("MaxSession", "" + DataStore.MySettings.MaxSession + "", "Settings");
+            IniBuild.Write("MinAccuracy", "" + DataStore.MySettings.AccMin + "", "Settings");
+            IniBuild.Write("MaxAccuracy", "" + DataStore.MySettings.AccMax + "", "Settings");
+            IniBuild.Write("SpaceWeaps", "" + DataStore.MySettings.SpaceWeaps + "", "Settings");
+            IniBuild.Write("Debug", "" + DataStore.MySettings.Debugger + "", "Settings");
+            IniBuild.Write("NoRadar", "" + DataStore.MySettings.NoRadar + "", "Settings");
+            IniBuild.Write("NoNotify", "" + DataStore.MySettings.NoNotify + "", "Settings");
+            IniBuild.Write("Players", "" + DataStore.MySettings.GetlayList + "", "Controls");
+            IniBuild.Write("MenuOpen", "" + DataStore.MySettings.DisableMod + "", "Controls");
         }
         public static PZSettings LoadIniSetts()
         {
             LoggerLight.GetLogging("IniSettings.LoadIniSetts");
 
-            PZSettings BuildSets = new PZSettings();
-            IniFile IniBuild = new IniFile();
+            PZSettings buildSets = new PZSettings();
 
+            IniFile IniBuild = new IniFile();
             if (File.Exists(sPath))
             {
-                BuildSets.iAggression = ReadMyInt(IniBuild.Read("Aggression", "Settings"));
-                BuildSets.iMaxPlayers = ReadMyInt(IniBuild.Read("MaxPlayers", "Settings"));
-                BuildSets.iMinWait = ReadMyInt(IniBuild.Read("MinWait", "Settings"));
-                BuildSets.iMaxWait = ReadMyInt(IniBuild.Read("MaxWait", "Settings"));
-                BuildSets.iMinSession = ReadMyInt(IniBuild.Read("MinSession", "Settings"));
-                BuildSets.iMaxSession = ReadMyInt(IniBuild.Read("MaxSession", "Settings"));
-                BuildSets.iAccMin = ReadMyInt(IniBuild.Read("MinAccuracy", "Settings"));
-                BuildSets.iAccMax = ReadMyInt(IniBuild.Read("MaxAccuracy", "Settings"));
-                BuildSets.bSpaceWeaps = ReadMyBool(IniBuild.Read("SpaceWeaps", "Settings"));
-                BuildSets.bDebugger = ReadMyBool(IniBuild.Read("Debug", "Settings"));
-                BuildSets.iGetlayList = ReadMyInt(IniBuild.Read("Players", "Controls"));
-                BuildSets.iClearPlayList = ReadMyInt(IniBuild.Read("ClearPlayers", "Controls"));
-                BuildSets.iDisableMod = ReadMyInt(IniBuild.Read("DisableMod", "Controls"));
+                buildSets.Aggression = ReadMyInt(IniBuild.Read("Aggression", "Settings"));
+                buildSets.MaxPlayers = ReadMyInt(IniBuild.Read("MaxPlayers", "Settings"));
+                buildSets.MinWait = ReadMyInt(IniBuild.Read("MinWait", "Settings"));
+                buildSets.MaxWait = ReadMyInt(IniBuild.Read("MaxWait", "Settings"));
+                buildSets.MinSession = ReadMyInt(IniBuild.Read("MinSession", "Settings"));
+                buildSets.MaxSession = ReadMyInt(IniBuild.Read("MaxSession", "Settings"));
+                buildSets.AccMin = ReadMyInt(IniBuild.Read("MinAccuracy", "Settings"));
+                buildSets.AccMax = ReadMyInt(IniBuild.Read("MaxAccuracy", "Settings"));
+                buildSets.SpaceWeaps = ReadMyBool(IniBuild.Read("SpaceWeaps", "Settings"));
+                buildSets.Debugger = ReadMyBool(IniBuild.Read("Debug", "Settings"));
+                buildSets.NoRadar = ReadMyBool(IniBuild.Read("NoRadar", "Settings"));
+                buildSets.NoNotify = ReadMyBool(IniBuild.Read("NoNotify", "Settings"));
+                buildSets.GetlayList = ReadMyInt(IniBuild.Read("Players", "Controls"));
+                buildSets.DisableMod = ReadMyInt(IniBuild.Read("MenuOpen", "Controls"));
             }
             else
             {
                 WriteSettingsIni();
             }
 
-            return BuildSets;
+            return buildSets;
         }
         public static int ReadMyInt(string sTing)
         {

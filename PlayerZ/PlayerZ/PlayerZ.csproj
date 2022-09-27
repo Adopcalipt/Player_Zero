@@ -32,6 +32,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="iFruitAddon2">
+      <HintPath>E:\Ado\Documents\My Projects\GtaMods\ScripptHookNet\iFruitAddon2.dll</HintPath>
+    </Reference>
     <Reference Include="NativeUI">
       <HintPath>E:\Ado\Documents\My Projects\GtaMods\ScripptHookNet\NativeUI.dll</HintPath>
     </Reference>
@@ -50,27 +53,31 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Classes\ContactList.cs" />
+    <Compile Include="Classes\JoinMe.cs" />
+    <Compile Include="Classes\MakeContact.cs" />
+    <Compile Include="Classes\VehBlips.cs" />
+    <Compile Include="ObjectLog.cs" />
     <Compile Include="HackazMenu.cs" />
-    <Compile Include="Class1.cs" />
+    <Compile Include="OnlinePlayerz.cs" />
     <Compile Include="Classes\Tattoo.cs" />
     <Compile Include="Classes\PZSettings.cs" />
     <Compile Include="Classes\IniFile.cs" />
-    <Compile Include="Classes\RandomPlus.cs" />
     <Compile Include="Classes\ClothBank.cs" />
     <Compile Include="Classes\ClothBankXML.cs" />
-    <Compile Include="Classes\PosDir.cs" />
+    <Compile Include="Classes\Vector4.cs" />
     <Compile Include="Classes\PedFixtures.cs" />
     <Compile Include="Classes\PlayerBrain.cs" />
     <Compile Include="Classes\AfkPlayer.cs" />
     <Compile Include="Classes\BackUpBrain.cs" />
     <Compile Include="Classes\FindVeh.cs" />
-    <Compile Include="Classes\PositionDirect.cs" />
     <Compile Include="Classes\FindPed.cs" />
     <Compile Include="Classes\GetInAveh.cs" />
-    <Compile Include="Classes\RandomPlusList.cs" />
+    <Compile Include="FreemodePed.cs" />
+    <Compile Include="PlayerAI.cs" />
+    <Compile Include="RandomNum.cs" />
     <Compile Include="ScaleDisp.cs" />
-    <Compile Include="BlipActions.cs" />
-    <Compile Include="VehActions.cs" />
+    <Compile Include="BuildObjects.cs" />
     <Compile Include="FindStuff.cs" />
     <Compile Include="ClearUp.cs" />
     <Compile Include="ReturnValues.cs" />

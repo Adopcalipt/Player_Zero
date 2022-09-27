@@ -4,31 +4,31 @@ using System.Xml.Serialization;
 
 namespace PlayerZero
 {
-    public class XmlReadWrite
+    public class XmlReadWrite : DataStore
     {
-        public static RandomPlusList LoadRando(string fileName)
+        public static ContactList LoadContact(string fileName)
         {
-            LoggerLight.GetLogging("XmlReadWrite.LoadRando == " + fileName);
+            LoggerLight.GetLogging("XmlReadWrite.LoadContact == " + fileName);
             try
             {
-                XmlSerializer xml = new XmlSerializer(typeof(RandomPlusList));
+                XmlSerializer xml = new XmlSerializer(typeof(ContactList));
                 using (StreamReader sr = new StreamReader(fileName))
                 {
-                    return (RandomPlusList)xml.Deserialize(sr);
+                    return (ContactList)xml.Deserialize(sr);
                 }
             }
             catch
             {
-                return new RandomPlusList();
+                return new ContactList();
             }
 
         }
-        public static void SaveRando(RandomPlusList config, string fileName)
+        public static void SaveMyContacts(ContactList config, string fileName)
         {
-            LoggerLight.GetLogging("XmlReadWrite.SaveRando == " + fileName);
+            LoggerLight.GetLogging("XmlReadWrite.SaveThisContact == " + fileName);
             try
             {
-                XmlSerializer xml = new XmlSerializer(typeof(RandomPlusList));
+                XmlSerializer xml = new XmlSerializer(typeof(ContactList));
                 using (StreamWriter sw = new StreamWriter(fileName))
                 {
                     xml.Serialize(sw, config);
@@ -36,9 +36,8 @@ namespace PlayerZero
             }
             catch
             {
-                LoggerLight.GetLogging("XmlReadWrite.SaveRando failed");
+                LoggerLight.GetLogging("XmlReadWrite.SaveThisContact failed");
             }
-
         }
         public static ClothBankXML LoadOutfitXML(string fileName)
         {
@@ -71,7 +70,6 @@ namespace PlayerZero
             catch
             {
                 LoggerLight.GetLogging("XmlReadWrite.SavePlayerBrain failed");
-
             }
 
         }

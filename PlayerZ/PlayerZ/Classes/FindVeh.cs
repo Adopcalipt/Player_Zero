@@ -5,8 +5,13 @@ namespace PlayerZero.Classes
     {
         public float MinRadi { get; set; }
         public float MaxRadi { get; set; }
-        public string VehModel { get; set; }
         public bool AddPlayer { get; set; }
-        public int AddtoBrain { get; set; }
+        public bool CanFill { get; set; }
+        public PlayerBrain Brains { get; set; }
+
+        public FindVeh(float minRadi, float maxRadi, bool addPlayer, bool canFill, PlayerBrain newBrain)
+        {
+            MinRadi = minRadi; MaxRadi = maxRadi; AddPlayer = addPlayer; CanFill = canFill; Brains = newBrain;
+        }
     }
 }

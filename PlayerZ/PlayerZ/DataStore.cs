@@ -4,6 +4,7 @@ using GTA.Native;
 using PlayerZero.Classes;
 using System.Collections.Generic;
 using System.IO;
+using System;
 
 namespace PlayerZero
 {
@@ -11,36 +12,41 @@ namespace PlayerZero
     {
         public static bool bTrainM { get; set; }
         public static bool bLoadUp { get; set; }
-        public static bool bPlayerList { get; set; }
         public static bool bHeistPop { get; set; }
         public static bool bHackerIn { get; set; }
         public static bool bPiggyBack { get; set; }
         public static bool bPlayerPiggyBack { get; set; }
         public static bool bHackEvent { get; set; }
         public static bool bDisabled { get; set; }
-        public static bool bEclipceWind { get; set; }
         public static bool bMenuOpen { get; set; }
+        public static bool bShowPlayerz { get; set; }
+        public static bool bScan { get; set; }
+        public static bool bClearingUp { get; set; }
+        public static bool bPlanePort { get; set; }
 
         public static readonly string sVersion = "1.8";
-        public static readonly string sMemory = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/PlayerZDataStore.sMemory.xml";
-        public static readonly string sOutfitts = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/Outfits.xml";
-        public static readonly string sRandFile = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/RanNum.Xml";
+        public static readonly string sSaveCont = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/SavedContacts.xml";
+        public static readonly string sPzFolder = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/";
+        public static readonly string sBeeLogs = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/PlayerZLog.txt";
+        public static readonly string sOutfits = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/Outfits.xml";
         public static readonly string sHasNSPM = "" + Directory.GetCurrentDirectory() + "/Scripts/NSPM";
         public static readonly string sHasWard = "" + Directory.GetCurrentDirectory() + "/Scripts/NSPM/Wardrobe";
         public static readonly string sPlayerM = "" + Directory.GetCurrentDirectory() + "/Scripts/NSPM/Wardrobe/FreemodeMale.Xml";
         public static readonly string sPlayerF = "" + Directory.GetCurrentDirectory() + "/Scripts/NSPM/Wardrobe/FreemodeFemale.Xml";
-        public static readonly string sPzFolder = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/";
-        public static readonly string sBeeLogs = "" + Directory.GetCurrentDirectory() + "/Scripts/PlayerZero/PlayerZLog.txt";
         public static readonly string sXmasTree = "prop_xmas_ext";
+        public static string sMoneyPicker { get; set; }
 
-        public static int iNpcList { get; set; }
-        public static int iBlpList { get; set; }
         public static int iFollow { get; set; }
         public static int iFolPos { get; set; }
-        public static int iCurrentPlayerz { get; set; }
         public static int iOrbBurnOut { get; set; }
         public static int iFindingTime { get; set; }
         public static int iScale { get; set; }
+        public static int iMoneyDrops { get; set; }
+        public static int iMoneyDropRate { get; set; }
+        public static int iPlaneLand { get; set; }
+        public static int iNextPlayer { get; set; }
+        public static int iEventFind { get; set; }
+
 
         public static int GP_Player { get; set; }
         public static readonly int iFollowMe = Function.Call<int>(Hash.CREATE_GROUP);
@@ -49,28 +55,34 @@ namespace PlayerZero
         public static readonly int Gp_Follow = World.AddRelationshipGroup("FollowerNPCs");
         public static readonly int GP_Mental = World.AddRelationshipGroup("MentalNPCs");
 
-        public static PositionDirect FindMe { get; set; }
+        public static Prop WindMill { get; set; }
         public static Vector3 LetsGoHere { get; set; }
 
-        public static List<ClothBank> MaleCloth { get; set; }
-        public static List<ClothBank> FemaleCloth { get; set; }
+        public static Vector3 FlyMeToo { get; set; }
         public static List<Vector3> AFKPlayers { get; set; }
         public static List<string> ControlSym { get; set; }
-        public static readonly List<string> DropProplist = new List<string> { "prop_container_ld2", "prop_rail_boxcar5", "prop_rub_carwreck_12", "prop_ind_coalcar_01", "prop_rub_carwreck_13", "prop_cablespool_01b", "prop_pipes_02b", "prop_container_01d", "prop_container_05a", "prop_gascyl_04a" };
-        public static readonly List<string> DropVehlist = new List<string> { "freight", "freightcar", "freightcont1", "freightcont2", "freightgrain", "metrotrain", "tankercar", "ripley", "tanker", "armytrailer2", "armytanker", "cablecar", "alkonost", "volatol", "jet", "cargoplane", "cutter", "mixer2", "tiptruck2", "bulldozer", "dump", "bus", "coach" };
+        public static List<string> PlayerNames { get; set; }
 
         public static List<bool> BeOnOff { get; set; }
         public static List<int> iTimers { get; set; }
+        public static ContactList PlayContList { get; set; }
 
         public static List<Prop> Plops { get; set; }
         public static List<Vehicle> Vicks { get; set; }
 
+        public static Vehicle ThatPlane { get; set; }
+
         public static List<PlayerBrain> PedList { get; set; }
         public static List<AfkPlayer> AFKList { get; set; }
 
-        public static List<FindVeh>  MakeCarz { get; set; }
-        public static List<FindPed>  MakeFrenz { get; set; }
-        public static List<GetInAveh>  GetInQUe { get; set; }
+        public static List<ClothBank> maleCloth = new List<ClothBank>();
+        public static List<ClothBank> femaleCloth = new List<ClothBank>();
+
+        public static List<PlayerBrain> AddtoPedList { get; set; }
+
+        public static JoinMe WalkFriend { get; set; }
+        public static JoinMe DriveFriend { get; set; }
+        public static JoinMe FlyFriend { get; set; }
 
         public static PZSettings MySettings { get; set; }
 
@@ -79,41 +91,55 @@ namespace PlayerZero
             if (File.Exists(sBeeLogs))
                 File.Delete(sBeeLogs);
 
+            ObjectLog.ClearThis();
+
             MySettings = IniSettings.LoadIniSetts();
 
             bTrainM = true;//set the test then set to false
             bLoadUp = false;
-            bPlayerList = false;
             bHeistPop = true;
             bHackerIn = false;
             bPiggyBack = false;
             bPlayerPiggyBack = false;
-            bEclipceWind = false;
             bHackEvent = false;
             bDisabled = false;
             bMenuOpen = false;
+            bShowPlayerz = false;
+            bScan = false;
+            bClearingUp = false;
+            bPlanePort = false;
 
-            iNpcList = 0;
-            iBlpList = 0;
             iFollow = 0;
             iFolPos = 0;
-            iCurrentPlayerz = 0;
             iOrbBurnOut = 0;
             iFindingTime = 0;
             iScale = 0;
+            iMoneyDrops = -1;
+            iMoneyDropRate = 0;
+            iPlaneLand = 0;
+            iNextPlayer = Game.GameTime + RandomNum.RandInt(DataStore.MySettings.MinWait, DataStore.MySettings.MaxWait);
+            iEventFind = CrimboHalo();
 
             GP_Player = Game.Player.Character.RelationshipGroup;
 
-            FindMe = null;
+            ThatPlane = null;
+            WindMill = null;
+            WalkFriend = null;
+            DriveFriend = null;
+            FlyFriend = null;
             LetsGoHere = Vector3.Zero;
+            FlyMeToo = Vector3.Zero;
 
-            MaleCloth = FindOutfits(true);
-            FemaleCloth = FindOutfits(false);
             AFKPlayers = AppLocalList();
             ControlSym = ControlSymLoad();
 
             BeOnOff = new List<bool>();
             iTimers = new List<int>();
+            PlayerNames = new List<string>();
+            PlayContList = LoadContsXml();
+
+            maleCloth = FindOutfits(true);
+            femaleCloth = FindOutfits(false);
 
             Plops = new List<Prop>();
             Vicks = new List<Vehicle>();
@@ -121,9 +147,62 @@ namespace PlayerZero
             PedList = new List<PlayerBrain>();
             AFKList = new List<AfkPlayer>();
 
-            MakeCarz = new List<FindVeh>();
-            MakeFrenz = new List<FindPed>();
-            GetInQUe = new List<GetInAveh>();
+            AddtoPedList = new List<PlayerBrain>();
+        }
+        public static int CrimboHalo()
+        {
+            int iBe = -1;
+
+            if (DateTime.Today.Month == 9 && DateTime.Today.Day == 31)
+                iBe = 1;
+            else if (DateTime.Today.Month == 12 && DateTime.Today.Day == 25)
+                iBe = 2;
+
+            return iBe;
+        }
+        public static List<ClothBank> FindOutfits(bool bMale)
+        {
+            LoggerLight.GetLogging("FreemodePed.FindOutfits");
+            List<ClothBank> CB = new List<ClothBank>();
+
+            if (Directory.Exists(sHasNSPM))
+            {
+                if (Directory.Exists(sHasWard))
+                {
+                    if (bMale)
+                    {
+                        if (File.Exists(sPlayerM))
+                        {
+                            ClothBankXML TheOutXML = XmlReadWrite.LoadOutfitXML(sPlayerM);
+                            for (int i = 0; i < TheOutXML.Outfits.Count; i++)
+                                CB.Add(TheOutXML.Outfits[i]);
+                        }
+                    }
+                    else
+                    {
+                        if (File.Exists(sPlayerF))
+                        {
+                            ClothBankXML TheOutXML = XmlReadWrite.LoadOutfitXML(sPlayerF);
+                            for (int i = 0; i < TheOutXML.Outfits.Count; i++)
+                                CB.Add(TheOutXML.Outfits[i]);
+                        }
+                    }
+                }
+            }
+            return CB;
+        }
+        private static ContactList LoadContsXml()
+        {
+            LoggerLight.GetLogging("DataStore.LoadContsXml");
+
+            ContactList brainList;
+
+            if (File.Exists(sSaveCont))
+                brainList = XmlReadWrite.LoadContact(sSaveCont);
+            else
+                brainList = new ContactList();
+
+            return brainList;
         }
         private static List<string> ControlSymLoad()
         {
@@ -544,173 +623,6 @@ namespace PlayerZero
             };
 
             return AppList;
-        }
-        private static List<ClothBank> FindOutfits(bool bMale)
-        {
-            LoggerLight.GetLogging("DataStore.FindOutfits");
-            bool BFound = false;
-            List<ClothBank> CB = new List<ClothBank>();
-
-            if (Directory.Exists(DataStore.sHasNSPM))
-            {
-                if (Directory.Exists(DataStore.sHasWard))
-                {
-                    if (bMale)
-                    {
-                        if (File.Exists(DataStore.sPlayerM))
-                        {
-                            BFound = true;
-                            ClothBankXML TheOutXML = XmlReadWrite.LoadOutfitXML(DataStore.sPlayerM);
-                            for (int i = 0; i < TheOutXML.Outfits.Count; i++)
-                                CB.Add(TheOutXML.Outfits[i]);
-                        }
-                    }
-                    else
-                    {
-                        if (File.Exists(DataStore.sPlayerF))
-                        {
-                            BFound = true;
-                            ClothBankXML TheOutXML = XmlReadWrite.LoadOutfitXML(DataStore.sPlayerF);
-                            for (int i = 0; i < TheOutXML.Outfits.Count; i++)
-                                CB.Add(TheOutXML.Outfits[i]);
-                        }
-                    }
-                }
-            }
-            if (!BFound)
-            {
-                if (Directory.Exists(sPzFolder))
-                {
-                    if (File.Exists(DataStore.sOutfitts))
-                    {
-                        ClothBankXML TheOutXML = XmlReadWrite.LoadOutfitXML(DataStore.sOutfitts);
-
-                        for (int i = 0; i < TheOutXML.Outfits.Count; i++)
-                        {
-                            if (bMale)
-                            {
-                                if (TheOutXML.Outfits[i].Title == "4")
-                                    CB.Add(TheOutXML.Outfits[i]);
-                            }
-                            else
-                            {
-                                if (TheOutXML.Outfits[i].Title == "5")
-                                    CB.Add(TheOutXML.Outfits[i]);
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (CB.Count == 0)
-                CB = BuildOutSet(bMale);
-
-            return CB;
-        }
-        private static List<ClothBank> BuildOutSet(bool bMale)
-        {
-            LoggerLight.GetLogging("DataStore.BuildOutSet");
-
-            List<ClothBank> C = new List<ClothBank>();
-
-            if (bMale)
-            {
-                ClothBank C1 = new ClothBank
-                {
-                    Title = "M01",
-                    ClothA = new List<int> { 0, 0, 5, 4, 10, 0, 23, 21, 31, 0, 0, 106 },
-                    ClothB = new List<int> { 0, 0, 0, 0,  0, 0,  0, 12,  3, 0, 0, 0 },
-                    ExtraA = new List<int> { -1, -1, -1, -1, -1 },
-                    ExtraB = new List<int> { 0, 0, 0, 0, 0 }
-                };
-                C.Add(C1);
-                ClothBank C2 = new ClothBank
-                {
-                    Title = "M02",
-                    ClothA = new List<int> { 0, 0, 5, 11, 23, 0, 21, 25,  6, 0, 0, 25 },
-                    ClothB = new List<int> { 0, 0, 0,  0,  8, 0,  6, 13, 12, 0, 0, 9 },
-                    ExtraA = new List<int> { 12, 18, -1, -1, -1 },
-                    ExtraB = new List<int> {  4,  7, 0, 0, 0 }
-                };
-                C.Add(C2);
-                ClothBank C3 = new ClothBank
-                {
-                    Title = "M03",
-                    ClothA = new List<int> { 0, 0, 5, 4, 0, 0, 12, 0, 15, 16, 0, 111 },
-                    ClothB = new List<int> { 0, 0, 0, 0, 4, 0,  3, 0,  0,  2, 0, 1 },
-                    ExtraA = new List<int> { -1, -1, -1, -1, -1 },
-                    ExtraB = new List<int> { 0, 0, 0, 0, 0 }
-                };
-                C.Add(C3);
-                ClothBank C4 = new ClothBank
-                {
-                    Title = "M04",
-                    ClothA = new List<int> { 0, 46, 5, 88, 40, 0, 25, 0, 62, 0, 0, 67 },
-                    ClothB = new List<int> { 0,  0, 0,  0,  2, 0,  0, 0,  2, 0, 0, 2 },
-                    ExtraA = new List<int> { -1, -1, -1, -1, -1 },
-                    ExtraB = new List<int> { 0, 0, 0, 0, 0 }
-                };
-                C.Add(C4);
-                ClothBank C5 = new ClothBank
-                {
-                    Title = "M05",
-                    ClothA = new List<int> { 0, 0, 5, 12, 24, 0, 10, 0, 32, 0, 0, 29 },
-                    ClothB = new List<int> { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-                    ExtraA = new List<int> { -1, -1, -1, -1, -1 },
-                    ExtraB = new List<int> { 0, 0, 0, 0, 0 }
-                };
-                C.Add(C5);
-            }
-            else
-            {
-                ClothBank C1 = new ClothBank
-                {
-                    Title = "M01",
-                    ClothA = new List<int> { 0, 0, 10, 2, 11, 0, 13, 0, 3, 0, 0, 2 },
-                    ClothB = new List<int> { 0, 0,  2, 0,  4, 0,  0, 0, 0, 0, 0, 2 },
-                    ExtraA = new List<int> { -1, -1, -1, -1, -1 },
-                    ExtraB = new List<int> { 0, 0, 0, 0, 0 }
-                };
-                C.Add(C1);
-                ClothBank C2 = new ClothBank
-                {
-                    Title = "M02",
-                    ClothA = new List<int> { 0, 0, 10, 46, 48, 0, 36, 0, 3, 18, 0, 88 },
-                    ClothB = new List<int> { 0, 0,  2,  1,  0, 0,  1, 0, 0,  1, 0, 0 },
-                    ExtraA = new List<int> { 58, 9, -1, -1, -1 },
-                    ExtraB = new List<int> { 1, 1, 0, 0, 0 }
-                };
-                C.Add(C2);
-                ClothBank C3 = new ClothBank
-                {
-                    Title = "M03",
-                    ClothA = new List<int> { 0, 0, 10, 2, 5, 0, 13, 0, 2, 0, 0, 2 },
-                    ClothB = new List<int> { 0, 0,  2, 0, 8, 0,  9, 0, 0, 0, 0, 1 },
-                    ExtraA = new List<int> { 6, 6, -1, -1, -1 },
-                    ExtraB = new List<int> { 2, 0, 0, 0, 0 }
-                };
-                C.Add(C3);
-                ClothBank C4 = new ClothBank
-                {
-                    Title = "M04",
-                    ClothA = new List<int> { 0, 0, 10, 5, 23, 0, 20, 6,  0, 0, 0, 24 },
-                    ClothB = new List<int> { 0, 0,  2, 0, 12, 0, 11, 0, 13, 0, 0, 9 },
-                    ExtraA = new List<int> { 13, -1, -1, -1, -1 },
-                    ExtraB = new List<int> { 1, 0, 0, 0, 0 }
-                };
-                C.Add(C4);
-                ClothBank C5 = new ClothBank
-                {
-                    Title = "M05",
-                    ClothA = new List<int> { 0, 0, 10, 3, 43, 0, 19, 0, 50, 0, 0, 65 },
-                    ClothB = new List<int> { 0, 0,  2, 0,  2, 0,  2, 0,  2, 0, 0, 0 },
-                    ExtraA = new List<int> { -1, 7, 6, -1, -1 },
-                    ExtraB = new List<int> { 0, 0, 0, 0, 0 }
-                };
-                C.Add(C5);
-            }
-
-            return C;
         }
     }
 }

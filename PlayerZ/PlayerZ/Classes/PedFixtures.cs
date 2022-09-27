@@ -26,7 +26,7 @@ namespace PlayerZero.Classes
         public int iHairCut { get; set; }
         public int PFHair01 { get; set; }
         public int PFHair02 { get; set; }
-        public ClothBank PedClothB { get; set; }
+        public ClothBank PedCloth { get; set; }
 
         public PedFixtures()
         {

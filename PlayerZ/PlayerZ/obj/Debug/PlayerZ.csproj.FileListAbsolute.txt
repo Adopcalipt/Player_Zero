@@ -9,3 +9,4 @@ C:\Users\Ado\source\repos\PlayerZ\PlayerZ\obj\Debug\PlayerZero.dll
 C:\Users\Ado\source\repos\PlayerZ\PlayerZ\obj\Debug\PlayerZero.pdb
 C:\Users\Ado\source\repos\PlayerZ\PlayerZ\obj\Debug\PlayerZ.csproj.AssemblyReference.cache
 C:\Users\Ado\source\repos\PlayerZ\PlayerZ\bin\Debug\NativeUI.dll
+C:\Users\Ado\source\repos\PlayerZ\PlayerZ\bin\Debug\iFruitAddon2.dll
